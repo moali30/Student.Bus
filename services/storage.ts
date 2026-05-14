@@ -24,6 +24,7 @@ const {
 const LIST_LIMIT = 100;
 const CACHE_TTL_MS = 30_000;
 
+// ── In-memory cache (short-lived, per session) ──
 const memoryCache = new Map<string, { expiresAt: number; value: any }>();
 
 const getCached = <T>(key: string): T | null => {
@@ -42,6 +43,44 @@ const setCached = (key: string, value: any, ttlMs = CACHE_TTL_MS) => {
 
 const invalidateCache = (...keys: string[]) => {
   keys.forEach(k => memoryCache.delete(k));
+};
+
+// ── Persistent localStorage cache (survives page refreshes, reduces API reads) ──
+const LS_PREFIX = 'msr_cache:';
+
+const getLSCached = <T>(key: string): T | null => {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    if (!raw) return null;
+    const item = JSON.parse(raw);
+    if (Date.now() > item.expiresAt) {
+      localStorage.removeItem(LS_PREFIX + key);
+      return null;
+    }
+    return item.value as T;
+  } catch { return null; }
+};
+
+const setLSCached = (key: string, value: any, ttlMs: number) => {
+  try {
+    localStorage.setItem(LS_PREFIX + key, JSON.stringify({
+      value,
+      expiresAt: Date.now() + ttlMs
+    }));
+  } catch { /* localStorage full or unavailable – ignore */ }
+};
+
+// Force-read from localStorage even if expired (for fallback when API fails)
+const getLSFallback = <T>(key: string): T | null => {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    if (!raw) return null;
+    return JSON.parse(raw).value as T;
+  } catch { return null; }
+};
+
+const invalidateLSCache = (...keys: string[]) => {
+  keys.forEach(k => localStorage.removeItem(LS_PREFIX + k));
 };
 
 const listAllDocuments = async (collectionId: string, queries: string[] = []) => {
@@ -289,17 +328,34 @@ export const StorageService = {
   },
   
   getActiveBatch: async (): Promise<Batch | undefined> => {
-    const res = await databases.listDocuments(databaseId, collectionIdBatches, [Query.equal('isActive', true)]);
-    if (res.documents.length === 0) return undefined;
-    const doc = res.documents[0];
-    return {
-      id: doc.$id,
-      name: doc.name,
-      isActive: doc.isActive,
-      isArchived: doc.isArchived,
-      createdAt: doc.createdAt,
-      fileId: doc.fileId
-    };
+    const cacheKey = 'activeBatch';
+    const ACTIVE_BATCH_TTL = 2 * 60 * 60 * 1000; // 2 hours – batch rarely changes
+
+    // 1) Check localStorage persistent cache first
+    const lsCached = getLSCached<Batch>(cacheKey);
+    if (lsCached) return lsCached;
+
+    // 2) Try API
+    try {
+      const res = await databases.listDocuments(databaseId, collectionIdBatches, [Query.equal('isActive', true)]);
+      if (res.documents.length === 0) return undefined;
+      const doc = res.documents[0];
+      const batch: Batch = {
+        id: doc.$id,
+        name: doc.name,
+        isActive: doc.isActive,
+        isArchived: doc.isArchived,
+        createdAt: doc.createdAt,
+        fileId: doc.fileId
+      };
+      setLSCached(cacheKey, batch, ACTIVE_BATCH_TTL);
+      return batch;
+    } catch (err) {
+      // 3) API failed (quota exceeded, network error) → fall back to stale cache
+      const fallback = getLSFallback<Batch>(cacheKey);
+      if (fallback) return fallback;
+      throw err; // no fallback available
+    }
   },
 
   getCourses: async (batchId?: string): Promise<Course[]> => {
@@ -658,55 +714,82 @@ export const StorageService = {
   },
   
   getAllStudentResults: async (studentId: string, batchId: string): Promise<{result: StudentResult, course: Course}[]> => {
-    const resultsRes = await databases.listDocuments(databaseId, collectionIdStudentResults, [
-        Query.equal('studentId', studentId),
-        Query.equal('batchId', batchId)
-    ]);
-    
-    if (resultsRes.documents.length === 0) return [];
-    
-    const coursesRes = await databases.listDocuments(databaseId, collectionIdCourses, [
-        Query.equal('batchId', batchId)
-    ]);
-    
-    const coursesMap = new Map();
-    coursesRes.documents.forEach(doc => {
-        coursesMap.set(doc.$id, {
-          id: doc.$id,
-          name: doc.name,
-          code: doc.code,
-          batchId: doc.batchId,
-          professorIds: doc.professorIds || [],
-          assistantIds: doc.assistantIds || [],
-          config: JSON.parse(doc.config),
-          isPublished: doc.isPublished
+    const cacheKey = `studentResults:${batchId}:${studentId}`;
+    const STUDENT_RESULTS_TTL = 30 * 60 * 1000; // 30 minutes
+
+    // 1) Check localStorage persistent cache first
+    const lsCached = getLSCached<{result: StudentResult, course: Course}[]>(cacheKey);
+    if (lsCached) return lsCached;
+
+    // 2) Try API
+    try {
+      const resultsRes = await databases.listDocuments(databaseId, collectionIdStudentResults, [
+          Query.equal('studentId', studentId),
+          Query.equal('batchId', batchId)
+      ]);
+      
+      if (resultsRes.documents.length === 0) {
+        setLSCached(cacheKey, [], STUDENT_RESULTS_TTL);
+        return [];
+      }
+      
+      // Cache courses per batch to avoid redundant reads
+      const coursesCacheKey = `courses_public:${batchId}`;
+      let coursesRecord = getLSCached<Record<string, Course>>(coursesCacheKey);
+      
+      if (!coursesRecord) {
+        const coursesRes = await databases.listDocuments(databaseId, collectionIdCourses, [
+            Query.equal('batchId', batchId)
+        ]);
+        
+        coursesRecord = {};
+        coursesRes.documents.forEach(doc => {
+            coursesRecord![doc.$id] = {
+              id: doc.$id,
+              name: doc.name,
+              code: doc.code,
+              batchId: doc.batchId,
+              professorIds: doc.professorIds || [],
+              assistantIds: doc.assistantIds || [],
+              config: JSON.parse(doc.config),
+              isPublished: doc.isPublished
+            };
         });
-    });
-    
-    const res: {result: StudentResult, course: Course}[] = [];
-    resultsRes.documents.forEach(doc => {
-        const course = coursesMap.get(doc.courseId);
-        if (course && course.isPublished) {
-            res.push({
-                result: {
-                    id: doc.$id,
-                    studentId: doc.studentId,
-                    studentName: doc.studentName,
-                    program: doc.program || '',
-                    courseId: doc.courseId,
-                    batchId: doc.batchId,
-                    quizScores: JSON.parse(doc.quizScores),
-                    assignmentScores: JSON.parse(doc.assignmentScores),
-                    bonusScore: doc.bonusScore,
-                    calculatedTotal: doc.calculatedTotal,
-                    isLocked: doc.isLocked
-                },
-                course: course
-            });
-        }
-    });
-    
-    return res;
+        // Cache courses for 1 hour – they change rarely
+        setLSCached(coursesCacheKey, coursesRecord, 60 * 60 * 1000);
+      }
+      
+      const res: {result: StudentResult, course: Course}[] = [];
+      resultsRes.documents.forEach(doc => {
+          const course = coursesRecord![doc.courseId];
+          if (course && course.isPublished) {
+              res.push({
+                  result: {
+                      id: doc.$id,
+                      studentId: doc.studentId,
+                      studentName: doc.studentName,
+                      program: doc.program || '',
+                      courseId: doc.courseId,
+                      batchId: doc.batchId,
+                      quizScores: JSON.parse(doc.quizScores),
+                      assignmentScores: JSON.parse(doc.assignmentScores),
+                      bonusScore: doc.bonusScore,
+                      calculatedTotal: doc.calculatedTotal,
+                      isLocked: doc.isLocked
+                  },
+                  course: course
+              });
+          }
+      });
+      
+      setLSCached(cacheKey, res, STUDENT_RESULTS_TTL);
+      return res;
+    } catch (err) {
+      // 3) API failed → fall back to stale cache
+      const fallback = getLSFallback<{result: StudentResult, course: Course}[]>(cacheKey);
+      if (fallback) return fallback;
+      throw err;
+    }
   }
 };
 

@@ -1,0 +1,6 @@
+{
+  "name": "Mental Student Results",
+  "description": "A comprehensive academic result management system supporting multiple user roles, advanced grading algorithms (Best N of M), batch management, and a public student portal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

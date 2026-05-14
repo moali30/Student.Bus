@@ -1,0 +1,92 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mental Student Results</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            spacing: {
+              "4.5": "1.125rem"
+            },
+            fontFamily: {
+              sans: ["Inter", "Segoe UI", "Tahoma", "Arial", "sans-serif"]
+            }
+          }
+        }
+      };
+    </script>
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react/": "https://esm.sh/react@19.0.0/",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+    "react-router-dom": "https://esm.sh/react-router-dom@7.1.1?deps=react@19.0.0",
+    "lucide-react": "https://esm.sh/lucide-react@0.475.0?deps=react@19.0.0",
+    "recharts": "https://esm.sh/recharts@2.15.0?deps=react@19.0.0",
+    "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+  }
+}
+</script>
+    <style>
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes scaleUp {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .animate-fade-in-up { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .animate-scale-up { animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+      .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+      
+      @media print {
+        @page {
+          size: A4 portrait;
+          margin: 0;
+        }
+        body {
+          margin: 0;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        /* Critical for multi-page printing in single-page apps */
+        html, body, #root {
+          height: auto !important;
+          overflow: visible !important;
+          width: 100%;
+        }
+        .print-hidden { display: none !important; }
+        
+        /* Force page break */
+        .print-break-after {
+          break-after: page;
+          page-break-after: always;
+        }
+        
+        /* Prevent break inside rows */
+        tr, td, th {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+      }
+    </style>
+</head>
+  <body class="bg-[#F8FAFC] text-slate-900">
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+  </body>
+</html>

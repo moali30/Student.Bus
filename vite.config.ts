@@ -5,6 +5,6 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // GitHub Pages deploys to https://<user>.github.io/Student.Bus/
-  base: '/Student.Bus/', 
+  // Vercel deploys to root /, GitHub Pages deploys to /Student.Bus/
+  base: process.env.GITHUB_ACTIONS ? '/Student.Bus/' : '/',
 })

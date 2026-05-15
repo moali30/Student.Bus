@@ -5,7 +5,7 @@ dotenv.config({ path: '.env.local' });
 const client = new Client()
     .setEndpoint(process.env.VITE_APPWRITE_ENDPOINT)
     .setProject(process.env.VITE_APPWRITE_PROJECT_ID)
-    .setKey(process.env.APPWRITE_API_KEY);
+    .setKey(process.env.VITE_APPWRITE_API_KEY || process.env.APPWRITE_API_KEY);
 
 const databases = new Databases(client);
 const dbId = process.env.VITE_APPWRITE_DATABASE_ID;
@@ -32,6 +32,12 @@ const updatePerms = async () => {
 
         await databases.updateCollection(dbId, 'studentResults', 'Student Results', perms);
         console.log("StudentResults permissions updated.");
+
+        await databases.updateCollection(dbId, 'importJobs', 'Import Jobs', perms);
+        console.log("ImportJobs permissions updated.");
+
+        await databases.updateCollection(dbId, 'exportJobs', 'Export Jobs', perms);
+        console.log("ExportJobs permissions updated.");
 
         console.log("All permissions updated successfully! The frontend can now read the data.");
     } catch(e) {

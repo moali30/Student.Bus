@@ -114,24 +114,51 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addUser = async (user: User) => {
     setUsers(prev => [...prev, user]); // Optimistic
     setIsSyncing(true);
-    const saved = await StorageService.saveUser(user);
-    setUsers(prev => prev.map(u => u.id === user.id ? saved : u));
-    setIsSyncing(false);
+    try {
+      const saved = await StorageService.saveUser(user);
+      setUsers(prev => prev.map(u => u.id === user.id ? saved : u));
+    } catch (error: any) {
+      console.error("Failed to add user:", error);
+      setUsers(prev => prev.filter(u => u.id !== user.id)); // Revert
+      alert(`فشل إضافة المستخدم: ${error.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const updateUser = async (user: User) => {
+    const originalUser = users.find(u => u.id === user.id);
     setUsers(prev => prev.map(u => u.id === user.id ? user : u)); // Optimistic
     setIsSyncing(true);
-    const saved = await StorageService.saveUser(user);
-    setUsers(prev => prev.map(u => u.id === user.id ? saved : u));
-    setIsSyncing(false);
+    try {
+      const saved = await StorageService.saveUser(user);
+      setUsers(prev => prev.map(u => u.id === user.id ? saved : u));
+    } catch (error: any) {
+      console.error("Failed to update user:", error);
+      if (originalUser) {
+        setUsers(prev => prev.map(u => u.id === user.id ? originalUser : u)); // Revert
+      }
+      alert(`فشل تعديل المستخدم: ${error.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const removeUser = async (id: string) => {
+    const originalUser = users.find(u => u.id === id);
     setUsers(prev => prev.filter(u => u.id !== id)); // Optimistic
     setIsSyncing(true);
-    await StorageService.deleteUser(id);
-    setIsSyncing(false);
+    try {
+      await StorageService.deleteUser(id);
+    } catch (error: any) {
+      console.error("Failed to delete user:", error);
+      if (originalUser) {
+        setUsers(prev => [...prev, originalUser]); // Revert
+      }
+      alert(`فشل حذف المستخدم: ${error.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // --- Batch Logic ---

@@ -126,31 +126,78 @@ const normalizeResultPayload = (result: StudentResult) => ({
 });
 
 const createAccountREST = async (userId: string, email: string, password: string, name: string) => {
-    const response = await fetch(`${import.meta.env.VITE_APPWRITE_ENDPOINT}/users`, {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    // In local development (Vite dev server), the /api folder isn't served by default unless configured.
+    // So we use the direct REST fallback for local testing.
+    if (isLocalhost) {
+        try {
+            const localResponse = await fetch(`${import.meta.env.VITE_APPWRITE_ENDPOINT}/users`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Appwrite-Project': import.meta.env.VITE_APPWRITE_PROJECT_ID,
+                    'X-Appwrite-Key': import.meta.env.VITE_APPWRITE_API_KEY
+                },
+                body: JSON.stringify({ userId, email, password, name })
+            });
+            const localData = await localResponse.json();
+            if (localResponse.ok) return localData;
+            
+            // If it failed locally, it might be due to CORS or missing API key, we fall through to try /api
+            console.warn("Local direct REST failed, falling back to /api/createUser...", localData.message);
+        } catch (e) {
+            console.warn("Local direct REST failed, falling back to /api/createUser...", e);
+        }
+    }
+
+    // Production (Vercel) uses the secure serverless function
+    const response = await fetch('/api/createUser', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-Appwrite-Project': import.meta.env.VITE_APPWRITE_PROJECT_ID,
-            'X-Appwrite-Key': import.meta.env.VITE_APPWRITE_API_KEY
         },
         body: JSON.stringify({ userId, email, password, name })
     });
+    
     const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Failed to create user account');
-    return data;
+    if (!response.ok) {
+        throw new Error(data.message || 'Failed to create user account via secure API');
+    }
+    return data.user || data;
 };
 
 const deleteAccountREST = async (userId: string) => {
-    const response = await fetch(`${import.meta.env.VITE_APPWRITE_ENDPOINT}/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-            'X-Appwrite-Project': import.meta.env.VITE_APPWRITE_PROJECT_ID,
-            'X-Appwrite-Key': import.meta.env.VITE_APPWRITE_API_KEY
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    if (isLocalhost) {
+        try {
+            const localResponse = await fetch(`${import.meta.env.VITE_APPWRITE_ENDPOINT}/users/${userId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-Appwrite-Project': import.meta.env.VITE_APPWRITE_PROJECT_ID,
+                    'X-Appwrite-Key': import.meta.env.VITE_APPWRITE_API_KEY
+                }
+            });
+            if (localResponse.ok) return;
+            const localData = await localResponse.json();
+            console.warn("Local direct REST failed, falling back to /api/deleteUser...", localData.message);
+        } catch (e) {
+            console.warn("Local direct REST failed, falling back to /api/deleteUser...", e);
         }
+    }
+
+    const response = await fetch('/api/deleteUser', {
+        method: 'POST', // Using POST with body for better compatibility
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId })
     });
+    
     if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || 'Failed to delete user account');
+        throw new Error(data.message || 'Failed to delete user account via secure API');
     }
 };
 

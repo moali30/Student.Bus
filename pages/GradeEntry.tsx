@@ -1051,9 +1051,9 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                    return (
                                        <div className="space-y-2 mb-6 sm:mb-8 mt-4 sm:mt-0">
                                            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 text-xl sm:text-2xl font-black">
-                                               {s?.studentName.charAt(0)}
+                                               {s?.studentName?.trim().charAt(0)}
                                            </div>
-                                           <h2 className="text-2xl sm:text-4xl font-black text-slate-900 leading-tight break-words">{s?.studentName}</h2>
+                                           <h2 className="text-2xl sm:text-4xl font-black text-slate-900 leading-tight break-words" dir="auto">{s?.studentName}</h2>
                                            <p className="text-base sm:text-xl font-mono text-slate-500 font-bold">{s?.studentId}</p>
                                        </div>
                                    )
@@ -1165,18 +1165,18 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                                   <button 
                                                       key={s.id}
                                                       onClick={() => handleSelectTurboStudent(s)}
-                                                      className={`w-full p-4 bg-white border rounded-2xl flex items-center justify-between hover:shadow-md transition-all text-left group ${idx === 0 ? 'ring-2 ring-indigo-100 border-indigo-500' : 'border-slate-100'}`}
+                                                      className={`w-full p-4 bg-white border rounded-2xl flex items-center justify-between hover:shadow-md transition-all group ${idx === 0 ? 'ring-2 ring-indigo-100 border-indigo-500' : 'border-slate-100'}`}
                                                   >
-                                                      <div className="flex items-center gap-4">
-                                                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg ${idx === 0 ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                                                              {s.studentName.charAt(0)}
+                                                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                                                          <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg ${idx === 0 ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                              {s.studentName.trim().charAt(0)}
                                                           </div>
-                                                          <div>
-                                                              <p className="font-bold text-slate-800 text-lg">{s.studentName}</p>
+                                                          <div className="min-w-0 flex-1 text-left" dir="auto">
+                                                              <p className="font-bold text-slate-800 text-lg truncate">{s.studentName}</p>
                                                               <p className="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded w-fit">{s.studentId}</p>
                                                           </div>
                                                       </div>
-                                                      <div className="flex items-center gap-3">
+                                                      <div className="flex items-center gap-3 shrink-0 ml-4">
                                                           {isGraded && <span className="text-emerald-500 font-bold text-sm bg-emerald-50 px-2 py-1 rounded-lg">{score}</span>}
                                                           <ArrowRight size={20} className={`${idx === 0 ? 'text-indigo-500' : 'text-slate-200'}`} />
                                                       </div>
@@ -1222,11 +1222,11 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                             onClick={() => handleSelectTurboStudent(s)}
                                             className={`w-full p-3 flex items-center justify-between text-left transition-colors hover:bg-slate-50 ${isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : 'border-l-4 border-transparent'}`}
                                           >
-                                              <div className="flex items-center gap-3 min-w-0">
+                                              <div className="flex items-center gap-3 min-w-0 flex-1">
                                                   <div className={`w-8 h-8 rounded-full flex shrink-0 items-center justify-center text-xs font-bold ${isGraded ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
                                                       {isGraded ? <Check size={14} strokeWidth={3} /> : <Circle size={14} />}
                                                   </div>
-                                                  <div className="min-w-0">
+                                                  <div className="min-w-0 flex-1" dir="auto">
                                                       <p className={`text-xs font-bold truncate ${isGraded ? 'text-slate-600' : 'text-slate-800'}`}>{s.studentName}</p>
                                                       <p className="text-[10px] font-mono text-slate-400">{s.studentId}</p>
                                                   </div>

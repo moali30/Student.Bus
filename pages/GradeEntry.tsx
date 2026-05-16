@@ -1063,11 +1063,36 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                     <div className="relative">
                                         <input 
                                             ref={turboGradeInputRef}
-                                            type="number"
+                                            type="text"
+                                            inputMode="decimal"
+                                            pattern="[0-9]*\.?[0-9]*"
                                             value={turboGradeInput}
-                                            onChange={e => setTurboGradeInput(e.target.value)}
+                                            onChange={e => {
+                                                const v = e.target.value;
+                                                if (v === '' || v === '-' || /^-?\d*\.?\d*$/.test(v)) {
+                                                    setTurboGradeInput(v);
+                                                }
+                                            }}
                                             onKeyDown={handleSaveTurboGrade}
-                                            className="w-full h-32 sm:h-40 text-center text-6xl sm:text-8xl font-black text-indigo-600 bg-slate-50 rounded-[24px] sm:rounded-[32px] border-[3px] sm:border-4 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            style={{
+                                                width: '100%',
+                                                height: '10rem',
+                                                textAlign: 'center',
+                                                fontSize: '5rem',
+                                                fontWeight: 900,
+                                                color: '#4f46e5',
+                                                background: '#f8fafc',
+                                                borderRadius: '24px',
+                                                border: '4px solid transparent',
+                                                outline: 'none',
+                                                boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.06)',
+                                                transition: 'all 0.2s',
+                                                WebkitAppearance: 'none',
+                                                MozAppearance: 'textfield',
+                                                appearance: 'none',
+                                            }}
+                                            onFocus={e => { e.target.style.background = '#fff'; e.target.style.borderColor = '#6366f1'; }}
+                                            onBlur={e => { e.target.style.background = '#f8fafc'; e.target.style.borderColor = 'transparent'; }}
                                             placeholder="-"
                                         />
                                         <div className="absolute right-0 left-0 -bottom-7 sm:-bottom-8 text-center text-slate-400 font-bold text-xs sm:text-sm uppercase tracking-widest">

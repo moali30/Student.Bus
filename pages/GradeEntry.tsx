@@ -1054,7 +1054,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                                {s?.studentName?.trim().charAt(0)}
                                            </div>
                                            <h2 className="text-2xl sm:text-4xl font-black text-slate-900 leading-tight break-words" dir="auto">{s?.studentName}</h2>
-                                           <p className="text-base sm:text-xl font-mono text-slate-500 font-bold">{s?.studentId}</p>
+                                           <p className="text-base sm:text-xl font-medium text-slate-500">{s?.studentId}</p>
                                        </div>
                                    )
                                 })()}
@@ -1067,7 +1067,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                             value={turboGradeInput}
                                             onChange={e => setTurboGradeInput(e.target.value)}
                                             onKeyDown={handleSaveTurboGrade}
-                                            className="w-full h-32 sm:h-40 text-center text-6xl sm:text-8xl font-black text-indigo-600 bg-slate-50 rounded-[24px] sm:rounded-[32px] border-[3px] sm:border-4 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none shadow-inner"
+                                            className="w-full h-32 sm:h-40 text-center text-6xl sm:text-8xl font-black text-indigo-600 bg-slate-50 rounded-[24px] sm:rounded-[32px] border-[3px] sm:border-4 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             placeholder="-"
                                         />
                                         <div className="absolute right-0 left-0 -bottom-7 sm:-bottom-8 text-center text-slate-400 font-bold text-xs sm:text-sm uppercase tracking-widest">
@@ -1126,8 +1126,8 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
 
                       <div className="flex flex-1 overflow-hidden">
                           {/* Center: Rapid Search Area */}
-                          <div className="flex-1 flex flex-col items-center justify-start pt-20 relative bg-slate-50/30">
-                              <div className="w-full max-w-xl space-y-6 animate-fade-in px-6">
+                          <div className="flex-1 flex flex-col items-center justify-start pt-10 sm:pt-20 relative bg-slate-50/30 overflow-y-auto">
+                              <div className="w-full max-w-xl space-y-6 animate-fade-in px-6 pb-20">
                                   <div className="text-center space-y-2 mb-8">
                                       <h2 className="text-3xl font-black text-slate-900">Rapid Grading</h2>
                                       <p className="text-slate-400 font-bold">Search student, Press Enter, Grade.</p>
@@ -1173,7 +1173,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                                           </div>
                                                           <div className="min-w-0 flex-1 text-left" dir="auto">
                                                               <p className="font-bold text-slate-800 text-lg truncate">{s.studentName}</p>
-                                                              <p className="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded w-fit">{s.studentId}</p>
+                                                              <p className="text-xs font-medium text-slate-400 bg-slate-50 px-2 py-0.5 rounded w-fit truncate">{s.studentId}</p>
                                                           </div>
                                                       </div>
                                                       <div className="flex items-center gap-3 shrink-0 ml-4">
@@ -1228,7 +1228,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                                   </div>
                                                   <div className="min-w-0 flex-1" dir="auto">
                                                       <p className={`text-xs font-bold truncate ${isGraded ? 'text-slate-600' : 'text-slate-800'}`}>{s.studentName}</p>
-                                                      <p className="text-[10px] font-mono text-slate-400">{s.studentId}</p>
+                                                      <p className="text-[10px] font-medium text-slate-400 truncate">{s.studentId}</p>
                                                   </div>
                                               </div>
                                               {isGraded && (

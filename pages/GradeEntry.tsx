@@ -129,7 +129,12 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               calculatedTotal: typeof s.calculatedTotal === 'number' ? s.calculatedTotal : 0
           }));
 
-          setStudents(safeStudents);
+          const sortedStudents = safeStudents.sort((a, b) => {
+              const oa = a.orderIndex ?? 99999;
+              const ob = b.orderIndex ?? 99999;
+              return oa - ob;
+          });
+          setStudents(sortedStudents);
           
           if (safeStudents.length === 0 && activeTab !== 'ROSTER') setActiveTab('ROSTER');
           else if (safeStudents.length > 0 && activeTab === 'ROSTER') setActiveTab('GRID');
@@ -430,11 +435,11 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
       const studentMap = new Map(students.map(s => [cleanId(s.studentId), s] as [string, StudentResult]));
       const studentsToSave: StudentResult[] = [];
 
-      uploadPreviewData.forEach((row: any) => {
+      uploadPreviewData.forEach((row: any, idx: number) => {
           const sid = cleanId(row.studentId);
           const existing = studentMap.get(sid);
           if (existing) {
-              const updated = { ...(existing as StudentResult), studentName: row.studentName, program: row.program };
+              const updated = { ...(existing as StudentResult), studentName: row.studentName, program: row.program, orderIndex: idx };
               studentMap.set(sid, updated);
               studentsToSave.push(updated);
           } else {
@@ -448,7 +453,8 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                   quizScores: Array(selectedCourse.config.quizCount).fill(null),
                   assignmentScores: Array(selectedCourse.config.assignmentCount).fill(null),
                   bonusScore: null,
-                  calculatedTotal: 0
+                  calculatedTotal: 0,
+                  orderIndex: idx
               };
               studentMap.set(sid, newStudent);
               studentsToSave.push(newStudent);

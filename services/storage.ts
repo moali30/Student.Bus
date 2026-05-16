@@ -122,7 +122,8 @@ const normalizeResultPayload = (result: StudentResult) => ({
   assignmentScores: JSON.stringify(result.assignmentScores),
   bonusScore: result.bonusScore === null ? null : Number(result.bonusScore),
   calculatedTotal: Number(result.calculatedTotal),
-  isLocked: !!result.isLocked
+  isLocked: !!result.isLocked,
+  orderIndex: result.orderIndex ?? null
 });
 
 const createAccountREST = async (userId: string, email: string, password: string, name: string) => {
@@ -473,7 +474,8 @@ export const StorageService = {
       assignmentScores: JSON.parse(doc.assignmentScores),
       bonusScore: doc.bonusScore,
       calculatedTotal: doc.calculatedTotal,
-      isLocked: doc.isLocked
+      isLocked: doc.isLocked,
+      orderIndex: doc.orderIndex ?? undefined
     }));
     setCached(cacheKey, results, 15_000);
     return results;

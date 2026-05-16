@@ -63,6 +63,7 @@ export interface StudentResult {
   bonusScore: number | null;
   calculatedTotal: number;
   isLocked?: boolean; 
+  orderIndex?: number; // Preserve original Excel upload order
 }
 
 export type DataJobType = 'IMPORT' | 'EXPORT';

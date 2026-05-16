@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { calculateStudentGrade } from '../services/storage';
@@ -25,9 +25,9 @@ interface GradeEntryProps {
 const normalizeArabic = (text: string) => {
   if (!text) return '';
   return text
-    .replace(/(ط·آ¢|ط·آ¥|ط·آ£)/g, 'ط·آ§')
-    .replace(/ط·آ©/g, 'ط¸â€،')
-    .replace(/ط¸â€°/g, 'ط¸ظ¹')
+    .replace(/(آ|إ|أ)/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
     .replace(/[\u064B-\u0652]/g, ''); // Remove Tashkeel
 };
 
@@ -327,9 +327,9 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
 
             // 3. Heuristic Header Detection
             let headerRowIdx = 0;
-            const idKeywords = ['id', 'student id', 'code', 'no.', 'ط·آ±ط¸â€ڑط¸â€¦', 'glos'];
-            const nameKeywords = ['name', 'student', 'ط·آ§ط¸â€‍ط·آ§ط·آ³ط¸â€¦', 'ط·آ·ط·آ§ط¸â€‍ط·آ¨', 'full name'];
-            const programKeywords = ['prog', 'major', 'track', 'dept', 'special', 'ط·آ§ط¸â€‍ط·آ¨ط·آ±ط¸â€ ط·آ§ط¸â€¦ط·آ¬', 'ط·آ§ط¸â€‍ط·ع¾ط·آ®ط·آµط·آµ', 'ط·آ§ط¸â€‍ط¸â€ڑط·آ³ط¸â€¦', 'ط·آ§ط¸â€‍ط·آ´ط·آ¹ط·آ¨ط·آ©', 'ط·آ§ط¸â€‍ط¸â€¦ط·آ³ط·آ§ط·آ±', 'department', 'specialization'];
+            const idKeywords = ['id', 'student id', 'code', 'no.', 'رقم', 'glos'];
+            const nameKeywords = ['name', 'student', 'الاسم', 'طالب', 'full name'];
+            const programKeywords = ['prog', 'major', 'track', 'dept', 'special', 'البرنامج', 'التخصص', 'القسم', 'الشعبة', 'المسار', 'department', 'specialization'];
             
             for(let r=0; r<Math.min(gridData.length, 5); r++) {
                  const rowStr = gridData[r].map(c => String(c).toLowerCase().trim());
@@ -569,7 +569,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                   let studentId = cleanId(normalizedRow['Student ID'] || normalizedRow['ID'] || normalizedRow['id']);
                   
                   let gradeVal = normalizedRow[targetLabel];
-                  if (gradeVal === undefined) gradeVal = normalizedRow['Grade'] || normalizedRow['Score'] || normalizedRow['ط·آ§ط¸â€‍ط·آ¯ط·آ±ط·آ¬ط·آ©'];
+                  if (gradeVal === undefined) gradeVal = normalizedRow['Grade'] || normalizedRow['Score'] || normalizedRow['الدرجة'];
                   
                   if (gradeVal === undefined) {
                       const possibleKeys = Object.keys(normalizedRow).filter(k => !['Student ID', 'ID', 'id', 'Student Name', 'Name', 'name'].includes(k));
@@ -951,14 +951,14 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                             <span className="block text-[8px] text-indigo-400 mt-0.5">Max: {safeConfig.quizIndividualMaxScores[i] || safeConfig.quizMaxScore}</span>
                                         </th>
                                     ))}
-                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-indigo-50 text-[10px] font-black text-indigo-700 min-w-[70px]">Quiz Total</th>
+                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-indigo-50 text-[10px] font-black text-indigo-700 min-w-[70px]">Quiz Σ</th>
                                     {Array.from({length: safeConfig.assignmentCount}).map((_, i) => (
                                         <th key={i} className="p-3 text-center border-b border-r border-slate-100 text-[9px] font-black hover:bg-emerald-100 transition-colors min-w-[60px]">
                                             A{i+1}
                                             <span className="block text-[8px] text-emerald-400 mt-0.5">Max: {safeConfig.assignmentIndividualMaxScores[i] || safeConfig.assignmentMaxScore}</span>
                                         </th>
                                     ))}
-                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-emerald-50 text-[10px] font-black text-emerald-700 min-w-[70px]">Assig Total</th>
+                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-emerald-50 text-[10px] font-black text-emerald-700 min-w-[70px]">Assig Σ</th>
                                     {safeConfig.enableBonus && <th className="p-3 text-center border-b border-slate-100 text-[10px] font-black text-amber-600 min-w-[60px]">Bonus</th>}
                                     <th className="p-4 text-center border-b border-l border-slate-200 bg-slate-100 sticky right-0 text-[10px] font-black min-w-[80px]">Total</th>
                                 </tr>
@@ -1039,73 +1039,58 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               {/* --- TURBO MODE CONTENT --- */}
               {activeTab === 'TURBO' && safeConfig && (
                   <div className="flex flex-col h-full relative">
-                      {/* Grading Overlay */}
-                      {turboSelectedStudentId && (() => {
-                        const s = students.find(st => st.id === turboSelectedStudentId);
-                        const maxScore = turboContext.type === 'quiz'
-                          ? (safeConfig.quizIndividualMaxScores[turboContext.index] || safeConfig.quizMaxScore)
-                          : (safeConfig.assignmentIndividualMaxScores[turboContext.index] || safeConfig.assignmentMaxScore);
-                        return (
-                          createPortal(<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:99999,background:'rgba(2,6,23,0.75)',backdropFilter:'blur(12px)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}} className="animate-fade-in" onClick={() => setTurboSelectedStudentId(null)}>
-                            <div style={{width:'100%',maxWidth:'460px',borderRadius:'28px',overflow:'hidden',boxShadow:'0 25px 60px -12px rgba(0,0,0,0.5)'}} className="animate-scale-up" onClick={e => e.stopPropagation()}>
-
-                              <div style={{background:'linear-gradient(145deg,#4f46e5 0%,#6366f1 50%,#818cf8 100%)',padding:'32px 28px 28px',position:'relative',overflow:'hidden'}}>
-                                <div style={{position:'absolute',top:'-30px',right:'-30px',width:'120px',height:'120px',borderRadius:'50%',background:'rgba(255,255,255,0.08)'}}></div>
-                                <div style={{position:'absolute',bottom:'-20px',left:'-20px',width:'80px',height:'80px',borderRadius:'50%',background:'rgba(255,255,255,0.05)'}}></div>
-                                <button onClick={() => setTurboSelectedStudentId(null)} style={{position:'absolute',top:'14px',right:'14px',width:'36px',height:'36px',background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'12px',cursor:'pointer',color:'rgba(255,255,255,0.8)',display:'flex',alignItems:'center',justifyContent:'center'}}><X size={16}/></button>
-                                <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'10px',position:'relative',zIndex:1}}>
-                                  <div style={{width:'60px',height:'60px',background:'rgba(255,255,255,0.15)',border:'2px solid rgba(255,255,255,0.2)',borderRadius:'18px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'24px',fontWeight:900,color:'#fff'}}>{s?.studentName?.trim().charAt(0)}</div>
-                                  <div style={{textAlign:'center'}}>
-                                    <div style={{fontSize:'20px',fontWeight:800,color:'#fff',lineHeight:1.4,wordBreak:'break-word',maxWidth:'350px'}} dir="auto">{s?.studentName}</div>
-                                    <div style={{fontSize:'13px',color:'rgba(255,255,255,0.55)',marginTop:'2px',fontWeight:500,letterSpacing:'0.5px'}}>{s?.studentId}</div>
+                      {/* Grading Overlay Modal - Portal */}
+                      {turboSelectedStudentId && createPortal(
+                        (() => {
+                          const s = students.find(st => st.id === turboSelectedStudentId);
+                          const maxScore = turboContext.type === 'quiz'
+                            ? (safeConfig.quizIndividualMaxScores[turboContext.index] || safeConfig.quizMaxScore)
+                            : (safeConfig.assignmentIndividualMaxScores[turboContext.index] || safeConfig.assignmentMaxScore);
+                          return (
+                            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:99999,background:'rgba(2,6,23,0.75)',backdropFilter:'blur(12px)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}} className="animate-fade-in" onClick={() => setTurboSelectedStudentId(null)}>
+                              <div style={{width:'100%',maxWidth:'460px',borderRadius:'28px',overflow:'hidden',boxShadow:'0 25px 60px -12px rgba(0,0,0,0.5)'}} className="animate-scale-up" onClick={e => e.stopPropagation()}>
+                                {/* Student Header */}
+                                <div style={{background:'linear-gradient(145deg,#4f46e5 0%,#6366f1 50%,#818cf8 100%)',padding:'32px 28px 28px',position:'relative',overflow:'hidden'}}>
+                                  <div style={{position:'absolute',top:'-30px',right:'-30px',width:'120px',height:'120px',borderRadius:'50%',background:'rgba(255,255,255,0.08)'}}></div>
+                                  <div style={{position:'absolute',bottom:'-20px',left:'-20px',width:'80px',height:'80px',borderRadius:'50%',background:'rgba(255,255,255,0.05)'}}></div>
+                                  <button onClick={() => setTurboSelectedStudentId(null)} style={{position:'absolute',top:'14px',right:'14px',width:'36px',height:'36px',background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'12px',cursor:'pointer',color:'rgba(255,255,255,0.8)',display:'flex',alignItems:'center',justifyContent:'center'}}><X size={16}/></button>
+                                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'10px',position:'relative',zIndex:1}}>
+                                    <div style={{width:'60px',height:'60px',background:'rgba(255,255,255,0.15)',border:'2px solid rgba(255,255,255,0.2)',borderRadius:'18px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'24px',fontWeight:900,color:'#fff'}}>{s?.studentName?.trim().charAt(0)}</div>
+                                    <div style={{textAlign:'center'}}>
+                                      <div style={{fontSize:'20px',fontWeight:800,color:'#fff',lineHeight:1.4,wordBreak:'break-word',maxWidth:'350px'}} dir="auto">{s?.studentName}</div>
+                                      <div style={{fontSize:'13px',color:'rgba(255,255,255,0.55)',marginTop:'2px',fontWeight:500,letterSpacing:'0.5px'}}>{s?.studentId}</div>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-
-                              <div style={{background:'#ffffff',padding:'36px 32px 32px'}}>
-                                <div style={{position:'relative',marginBottom:'16px'}}>
-                                  <input
-                                    ref={turboGradeInputRef}
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={turboGradeInput}
-                                    onChange={e => { const v = e.target.value; if (v === '' || /^\d*\.?\d*$/.test(v)) setTurboGradeInput(v); }}
-                                    onKeyDown={handleSaveTurboGrade}
-                                    placeholder="0"
-                                    autoFocus
-                                    style={{
-                                      width:'100%',height:'100px',textAlign:'center',fontSize:'64px',fontWeight:900,
-                                      color:'#4f46e5',background:'linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%)',
-                                      borderRadius:'20px',border:'2px solid #e0e7ff',outline:'none',
-                                      boxShadow:'inset 0 2px 8px rgba(99,102,241,0.06), 0 1px 3px rgba(0,0,0,0.04)',
-                                      transition:'all 0.2s ease',caretColor:'#6366f1',letterSpacing:'-1px'
-                                    }}
-                                    onFocus={e => { e.target.style.borderColor='#818cf8'; e.target.style.boxShadow='inset 0 2px 8px rgba(99,102,241,0.06), 0 0 0 4px rgba(99,102,241,0.1)'; e.target.style.background='#fff'; }}
-                                    onBlur={e => { e.target.style.borderColor='#e0e7ff'; e.target.style.boxShadow='inset 0 2px 8px rgba(99,102,241,0.06), 0 1px 3px rgba(0,0,0,0.04)'; }}
-                                  />
+                                {/* Grade Input */}
+                                <div style={{background:'#ffffff',padding:'36px 32px 32px'}}>
+                                  <div style={{position:'relative',marginBottom:'16px'}}>
+                                    <input
+                                      ref={turboGradeInputRef}
+                                      type="text"
+                                      inputMode="decimal"
+                                      value={turboGradeInput}
+                                      onChange={e => { const v = e.target.value; if (v === '' || /^\d*\.?\d*$/.test(v)) setTurboGradeInput(v); }}
+                                      onKeyDown={handleSaveTurboGrade}
+                                      placeholder="0"
+                                      autoFocus
+                                      style={{width:'100%',height:'100px',textAlign:'center',fontSize:'64px',fontWeight:900,color:'#4f46e5',background:'linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%)',borderRadius:'20px',border:'2px solid #e0e7ff',outline:'none',boxShadow:'inset 0 2px 8px rgba(99,102,241,0.06), 0 1px 3px rgba(0,0,0,0.04)',caretColor:'#6366f1',letterSpacing:'-1px'}}
+                                    />
+                                  </div>
+                                  <div style={{textAlign:'center',marginBottom:'24px'}}>
+                                    <span style={{display:'inline-block',fontSize:'11px',fontWeight:800,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'3px',background:'#f1f5f9',padding:'6px 16px',borderRadius:'8px'}}>out of {maxScore}</span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleSaveTurboGrade({ key: 'Enter', preventDefault: () => {} } as any)}
+                                    style={{width:'100%',height:'54px',background:'linear-gradient(145deg,#4f46e5 0%,#6366f1 100%)',color:'#fff',border:'none',borderRadius:'16px',fontSize:'15px',fontWeight:800,cursor:'pointer',boxShadow:'0 4px 16px rgba(79,70,229,0.35)',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',letterSpacing:'0.3px'}}
+                                  >Save & Next <span style={{opacity:0.5,fontSize:'12px',marginLeft:'4px'}}>Enter</span></button>
                                 </div>
-                                <div style={{textAlign:'center',marginBottom:'24px'}}>
-                                  <span style={{display:'inline-block',fontSize:'11px',fontWeight:800,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'3px',background:'#f1f5f9',padding:'6px 16px',borderRadius:'8px'}}>out of {maxScore}</span>
-                                </div>
-                                <button
-                                  onClick={() => handleSaveTurboGrade({ key: 'Enter', preventDefault: () => {} } as any)}
-                                  style={{
-                                    width:'100%',height:'54px',
-                                    background:'linear-gradient(145deg,#4f46e5 0%,#6366f1 100%)',
-                                    color:'#fff',border:'none',borderRadius:'16px',fontSize:'15px',fontWeight:800,
-                                    cursor:'pointer',boxShadow:'0 4px 16px rgba(79,70,229,0.35)',
-                                    display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',
-                                    transition:'all 0.15s ease',letterSpacing:'0.3px'
-                                  }}
-                                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; }}
-                                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; }}
-                                >Save &amp; Next <span style={{opacity:0.5,fontSize:'12px',marginLeft:'4px'}}>Enter</span></button>
                               </div>
-
                             </div>
-                          </div>, document.body)
-                        );
-                      })()}
+                          );
+                        })(),
+                        document.body
+                      )}
 
                       {/* Top Bar: Progress & Context */}
                       <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -1172,7 +1157,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                           autoFocus
                                       />
                                       <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-                                          <span className="bg-slate-100 text-slate-400 text-[10px] font-black uppercase px-2 py-1 rounded">Enter أ¢â€ آµ</span>
+                                          <span className="bg-slate-100 text-slate-400 text-[10px] font-black uppercase px-2 py-1 rounded">Enter ↵</span>
                                       </div>
                                   </div>
 
@@ -1352,9 +1337,9 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                 <div>
                                     <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Program</label>
                                     <select value={newStudentProgram} onChange={e => setNewStudentProgram(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-indigo-200 font-bold outline-none appearance-none">
-                                        <option value="General">General (ط·آ¹ط·آ§ط¸â€¦)</option>
-                                        <option value="Accounting">Accounting (ط¸â€¦ط·آ­ط·آ§ط·آ³ط·آ¨ط·آ©)</option>
-                                        <option value="Management">Management (ط·آ¥ط·آ¯ط·آ§ط·آ±ط·آ©)</option>
+                                        <option value="General">General (عام)</option>
+                                        <option value="Accounting">Accounting (محاسبة)</option>
+                                        <option value="Management">Management (إدارة)</option>
                                     </select>
                                 </div>
                                 <button type="submit" className="bg-indigo-600 text-white p-3 rounded-xl font-black hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
@@ -1402,10 +1387,10 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                   <table className="w-full text-right" dir="rtl">
                                       <thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase">
                                           <tr>
-                                              <th className="px-6 py-4">ط·آ±ط¸â€ڑط¸â€¦ ط·آ§ط¸â€‍ط·آ¬ط¸â€‍ط¸ث†ط·آ³</th>
-                                              <th className="px-6 py-4">ط·آ§ط¸â€‍ط·آ§ط·آ³ط¸â€¦</th>
-                                              <th className="px-6 py-4">ط·آ§ط¸â€‍ط·آ¨ط·آ±ط¸â€ ط·آ§ط¸â€¦ط·آ¬</th>
-                                              <th className="px-6 py-4">ط·آ§ط¸â€‍ط·آ¥ط·آ¬ط·آ±ط·آ§ط·طŒط·آ§ط·ع¾</th>
+                                              <th className="px-6 py-4">رقم الجلوس</th>
+                                              <th className="px-6 py-4">الاسم</th>
+                                              <th className="px-6 py-4">البرنامج</th>
+                                              <th className="px-6 py-4">الإجراءات</th>
                                           </tr>
                                       </thead>
                                       <tbody className="divide-y divide-slate-50">
@@ -1467,7 +1452,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               boxShadow: '0 32px 64px -16px rgba(0,0,0,0.3)',
             }}
           >
-            {/* أ¢â€‌â‚¬أ¢â€‌â‚¬ Header أ¢â€‌â‚¬أ¢â€‌â‚¬ */}
+            {/* ── Header ── */}
             <div style={{ padding: '24px 28px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexShrink: 0 }}>
               <div>
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -1480,7 +1465,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               <button disabled={isProcessingUpload} onClick={() => setUploadPreviewData(null)} style={{ flexShrink: 0, padding: '12px', background: '#f8fafc', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: '16px', cursor: 'pointer' }}><X size={20} strokeWidth={2.5}/></button>
             </div>
 
-            {/* أ¢â€‌â‚¬أ¢â€‌â‚¬ Scrollable Body أ¢â€‌â‚¬أ¢â€‌â‚¬ */}
+            {/* ── Scrollable Body ── */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', minHeight: 0 }}>
               {isProcessingUpload ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '24px', padding: '48px 0' }}>
@@ -1539,7 +1524,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               )}
             </div>
 
-            {/* أ¢â€‌â‚¬أ¢â€‌â‚¬ Footer أ¢â€‌â‚¬أ¢â€‌â‚¬ */}
+            {/* ── Footer ── */}
             {!isProcessingUpload && (
               <div style={{ padding: '20px 28px', borderTop: '1px solid #e2e8f0', flexShrink: 0 }}>
                 <button

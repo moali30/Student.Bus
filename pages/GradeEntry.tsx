@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { calculateStudentGrade } from '../services/storage';
 import { StudentResult, User, UserRole } from '../types';
@@ -1068,7 +1068,6 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                           </div>
                         );
                       })()}
-                      )}
 
                       {/* Top Bar: Progress & Context */}
                       <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">

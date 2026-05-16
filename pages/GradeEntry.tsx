@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { calculateStudentGrade } from '../services/storage';
 import { StudentResult, User, UserRole } from '../types';
@@ -24,9 +24,9 @@ interface GradeEntryProps {
 const normalizeArabic = (text: string) => {
   if (!text) return '';
   return text
-    .replace(/(ط¢|ط¥|ط£)/g, 'ط§')
-    .replace(/ط©/g, 'ظ‡')
-    .replace(/ظ‰/g, 'ظٹ')
+    .replace(/(ط·آ¢|ط·آ¥|ط·آ£)/g, 'ط·آ§')
+    .replace(/ط·آ©/g, 'ط¸â€،')
+    .replace(/ط¸â€°/g, 'ط¸ظ¹')
     .replace(/[\u064B-\u0652]/g, ''); // Remove Tashkeel
 };
 
@@ -326,9 +326,9 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
 
             // 3. Heuristic Header Detection
             let headerRowIdx = 0;
-            const idKeywords = ['id', 'student id', 'code', 'no.', 'ط±ظ‚ظ…', 'glos'];
-            const nameKeywords = ['name', 'student', 'ط§ظ„ط§ط³ظ…', 'ط·ط§ظ„ط¨', 'full name'];
-            const programKeywords = ['prog', 'major', 'track', 'dept', 'special', 'ط§ظ„ط¨ط±ظ†ط§ظ…ط¬', 'ط§ظ„طھط®طµطµ', 'ط§ظ„ظ‚ط³ظ…', 'ط§ظ„ط´ط¹ط¨ط©', 'ط§ظ„ظ…ط³ط§ط±', 'department', 'specialization'];
+            const idKeywords = ['id', 'student id', 'code', 'no.', 'ط·آ±ط¸â€ڑط¸â€¦', 'glos'];
+            const nameKeywords = ['name', 'student', 'ط·آ§ط¸â€‍ط·آ§ط·آ³ط¸â€¦', 'ط·آ·ط·آ§ط¸â€‍ط·آ¨', 'full name'];
+            const programKeywords = ['prog', 'major', 'track', 'dept', 'special', 'ط·آ§ط¸â€‍ط·آ¨ط·آ±ط¸â€ ط·آ§ط¸â€¦ط·آ¬', 'ط·آ§ط¸â€‍ط·ع¾ط·آ®ط·آµط·آµ', 'ط·آ§ط¸â€‍ط¸â€ڑط·آ³ط¸â€¦', 'ط·آ§ط¸â€‍ط·آ´ط·آ¹ط·آ¨ط·آ©', 'ط·آ§ط¸â€‍ط¸â€¦ط·آ³ط·آ§ط·آ±', 'department', 'specialization'];
             
             for(let r=0; r<Math.min(gridData.length, 5); r++) {
                  const rowStr = gridData[r].map(c => String(c).toLowerCase().trim());
@@ -568,7 +568,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                   let studentId = cleanId(normalizedRow['Student ID'] || normalizedRow['ID'] || normalizedRow['id']);
                   
                   let gradeVal = normalizedRow[targetLabel];
-                  if (gradeVal === undefined) gradeVal = normalizedRow['Grade'] || normalizedRow['Score'] || normalizedRow['ط§ظ„ط¯ط±ط¬ط©'];
+                  if (gradeVal === undefined) gradeVal = normalizedRow['Grade'] || normalizedRow['Score'] || normalizedRow['ط·آ§ط¸â€‍ط·آ¯ط·آ±ط·آ¬ط·آ©'];
                   
                   if (gradeVal === undefined) {
                       const possibleKeys = Object.keys(normalizedRow).filter(k => !['Student ID', 'ID', 'id', 'Student Name', 'Name', 'name'].includes(k));
@@ -950,14 +950,14 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                             <span className="block text-[8px] text-indigo-400 mt-0.5">Max: {safeConfig.quizIndividualMaxScores[i] || safeConfig.quizMaxScore}</span>
                                         </th>
                                     ))}
-                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-indigo-50 text-[10px] font-black text-indigo-700 min-w-[70px]">Quiz خ£</th>
+                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-indigo-50 text-[10px] font-black text-indigo-700 min-w-[70px]">Quiz ط®آ£</th>
                                     {Array.from({length: safeConfig.assignmentCount}).map((_, i) => (
                                         <th key={i} className="p-3 text-center border-b border-r border-slate-100 text-[9px] font-black hover:bg-emerald-100 transition-colors min-w-[60px]">
                                             A{i+1}
                                             <span className="block text-[8px] text-emerald-400 mt-0.5">Max: {safeConfig.assignmentIndividualMaxScores[i] || safeConfig.assignmentMaxScore}</span>
                                         </th>
                                     ))}
-                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-emerald-50 text-[10px] font-black text-emerald-700 min-w-[70px]">Assig خ£</th>
+                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-emerald-50 text-[10px] font-black text-emerald-700 min-w-[70px]">Assig ط®آ£</th>
                                     {safeConfig.enableBonus && <th className="p-3 text-center border-b border-slate-100 text-[10px] font-black text-amber-600 min-w-[60px]">Bonus</th>}
                                     <th className="p-4 text-center border-b border-l border-slate-200 bg-slate-100 sticky right-0 text-[10px] font-black min-w-[80px]">Total</th>
                                 </tr>
@@ -1038,32 +1038,26 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               {/* --- TURBO MODE CONTENT --- */}
               {activeTab === 'TURBO' && safeConfig && (
                   <div className="flex flex-col h-full relative">
-                      {/* Grading Overlay Modal - REBUILT */}
+                      {/* Grading Overlay */}
                       {turboSelectedStudentId && (() => {
                         const s = students.find(st => st.id === turboSelectedStudentId);
                         const maxScore = turboContext.type === 'quiz'
                           ? (safeConfig.quizIndividualMaxScores[turboContext.index] || safeConfig.quizMaxScore)
                           : (safeConfig.assignmentIndividualMaxScores[turboContext.index] || safeConfig.assignmentMaxScore);
                         return (
-                          <div style={{position:'absolute',inset:0,zIndex:50,background:'rgba(15,23,42,0.7)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'}} className="animate-fade-in">
-                            <div style={{width:'100%',maxWidth:'340px',background:'#fff',borderRadius:'28px',boxShadow:'0 32px 64px rgba(0,0,0,0.25)',overflow:'hidden'}} className="animate-scale-up">
-                              <div style={{background:'linear-gradient(135deg,#6366f1,#4338ca)',padding:'20px 20px 18px',textAlign:'center',position:'relative'}}>
-                                <button onClick={() => setTurboSelectedStudentId(null)} style={{position:'absolute',top:'10px',left:'10px',background:'rgba(255,255,255,0.15)',border:'none',borderRadius:'10px',padding:'7px',cursor:'pointer',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center'}}><X size={16}/></button>
-                                <div style={{width:'44px',height:'44px',background:'rgba(255,255,255,0.2)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 10px',fontSize:'18px',fontWeight:900,color:'#fff'}}>{s?.studentName?.trim().charAt(0)}</div>
-                                <div style={{fontSize:'18px',fontWeight:900,color:'#fff',lineHeight:1.3,wordBreak:'break-word',padding:'0 24px'}} dir="auto">{s?.studentName}</div>
-                                <div style={{fontSize:'12px',color:'rgba(255,255,255,0.65)',marginTop:'4px',fontWeight:600}}>{s?.studentId}</div>
+                          <div style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(15,23,42,0.7)',backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}} className="animate-fade-in" onClick={() => setTurboSelectedStudentId(null)}>
+                            <div style={{width:'100%',maxWidth:'420px',background:'#fff',borderRadius:'32px',boxShadow:'0 32px 80px rgba(0,0,0,0.3)',overflow:'hidden'}} className="animate-scale-up" onClick={e => e.stopPropagation()}>
+                              <div style={{background:'linear-gradient(135deg,#6366f1,#4338ca)',padding:'28px 24px 24px',textAlign:'center',position:'relative'}}>
+                                <button onClick={() => setTurboSelectedStudentId(null)} style={{position:'absolute',top:'12px',right:'12px',background:'rgba(255,255,255,0.15)',border:'none',borderRadius:'12px',padding:'8px',cursor:'pointer',color:'#fff',display:'flex'}}><X size={18}/></button>
+                                <div style={{width:'56px',height:'56px',background:'rgba(255,255,255,0.2)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px',fontSize:'22px',fontWeight:900,color:'#fff'}}>{s?.studentName?.trim().charAt(0)}</div>
+                                <div style={{fontSize:'22px',fontWeight:900,color:'#fff',lineHeight:1.3,wordBreak:'break-word'}} dir="auto">{s?.studentName}</div>
+                                <div style={{fontSize:'14px',color:'rgba(255,255,255,0.6)',marginTop:'6px',fontWeight:600}}>{s?.studentId}</div>
                               </div>
-                              <div style={{padding:'20px 20px 4px',background:'#f8fafc',textAlign:'center',borderBottom:'1px solid #e2e8f0'}}>
-                                <div style={{fontSize:turboGradeInput?'68px':'48px',fontWeight:900,color:turboGradeInput?'#4f46e5':'#c7d2fe',lineHeight:1,minHeight:'72px',display:'flex',alignItems:'center',justifyContent:'center',letterSpacing:'-2px',transition:'all 0.15s'}}>{turboGradeInput || '—'}</div>
-                                <div style={{fontSize:'10px',fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'2px',padding:'8px 0 12px'}}>OUT OF {maxScore}</div>
+                              <div style={{padding:'32px 28px 28px',textAlign:'center'}}>
+                                <input ref={turboGradeInputRef} type="text" inputMode="decimal" value={turboGradeInput} onChange={e => { const v = e.target.value; if (v === '' || /^\d*\.?\d*$/.test(v)) setTurboGradeInput(v); }} onKeyDown={handleSaveTurboGrade} placeholder="0" style={{width:'100%',height:'90px',textAlign:'center',fontSize:'56px',fontWeight:900,color:'#4f46e5',background:'#f8fafc',borderRadius:'20px',border:'3px solid #e0e7ff',outline:'none'}} autoFocus />
+                                <div style={{fontSize:'12px',fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'2px',marginTop:'12px'}}>OUT OF {maxScore}</div>
+                                <button onClick={() => handleSaveTurboGrade({ key: 'Enter', preventDefault: () => {} } as any)} style={{width:'100%',height:'56px',marginTop:'20px',background:'linear-gradient(135deg,#6366f1,#4338ca)',color:'#fff',border:'none',borderRadius:'16px',fontSize:'17px',fontWeight:900,cursor:'pointer',boxShadow:'0 8px 24px rgba(99,102,241,0.3)'}}>Save &amp; Next (Enter)</button>
                               </div>
-                              <input ref={turboGradeInputRef} type="text" inputMode="decimal" value={turboGradeInput} onChange={e=>{const v=e.target.value;if(v===''||/^\d*\.?\d*$/.test(v))setTurboGradeInput(v);}} onKeyDown={handleSaveTurboGrade} style={{position:'absolute',opacity:0,width:'1px',height:'1px',pointerEvents:'none'}}/>
-                              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px',padding:'12px'}}>
-                                {['1','2','3','4','5','6','7','8','9','.','0','X'].map(k=>(
-                                  <button key={k} onClick={()=>{if(k==='X')setTurboGradeInput(p=>p.slice(0,-1));else if(k==='.'&&turboGradeInput.includes('.'))return;else setTurboGradeInput(p=>p+k);setTimeout(()=>turboGradeInputRef.current?.focus(),0);}} style={{height:'48px',background:k==='X'?'#fff1f2':'#f8fafc',color:k==='X'?'#ef4444':'#1e293b',border:'1.5px solid',borderColor:k==='X'?'#fecdd3':'#e2e8f0',borderRadius:'10px',fontSize:'19px',fontWeight:700,cursor:'pointer'}} onMouseDown={e=>{(e.currentTarget as HTMLButtonElement).style.transform='scale(0.9)';}} onMouseUp={e=>{(e.currentTarget as HTMLButtonElement).style.transform='scale(1)';}}>{k==='X'?'⌫':k}</button>
-                                ))}
-                              </div>
-                              <div style={{padding:'0 12px 16px'}}><button onClick={()=>handleSaveTurboGrade({key:'Enter',preventDefault:()=>{}} as any)} style={{width:'100%',height:'52px',background:'linear-gradient(135deg,#6366f1,#4338ca)',color:'#fff',border:'none',borderRadius:'14px',fontSize:'16px',fontWeight:900,cursor:'pointer',boxShadow:'0 6px 20px rgba(99,102,241,0.35)'}} onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)';}} onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.transform='translateY(0)';}} >Save &amp; Next ↵</button></div>
                             </div>
                           </div>
                         );
@@ -1134,7 +1128,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                           autoFocus
                                       />
                                       <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-                                          <span className="bg-slate-100 text-slate-400 text-[10px] font-black uppercase px-2 py-1 rounded">Enter â†µ</span>
+                                          <span className="bg-slate-100 text-slate-400 text-[10px] font-black uppercase px-2 py-1 rounded">Enter أ¢â€ آµ</span>
                                       </div>
                                   </div>
 
@@ -1314,9 +1308,9 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                 <div>
                                     <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Program</label>
                                     <select value={newStudentProgram} onChange={e => setNewStudentProgram(e.target.value)} className="w-full bg-white p-3 rounded-xl border border-indigo-200 font-bold outline-none appearance-none">
-                                        <option value="General">General (ط¹ط§ظ…)</option>
-                                        <option value="Accounting">Accounting (ظ…ط­ط§ط³ط¨ط©)</option>
-                                        <option value="Management">Management (ط¥ط¯ط§ط±ط©)</option>
+                                        <option value="General">General (ط·آ¹ط·آ§ط¸â€¦)</option>
+                                        <option value="Accounting">Accounting (ط¸â€¦ط·آ­ط·آ§ط·آ³ط·آ¨ط·آ©)</option>
+                                        <option value="Management">Management (ط·آ¥ط·آ¯ط·آ§ط·آ±ط·آ©)</option>
                                     </select>
                                 </div>
                                 <button type="submit" className="bg-indigo-600 text-white p-3 rounded-xl font-black hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
@@ -1364,10 +1358,10 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                   <table className="w-full text-right" dir="rtl">
                                       <thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase">
                                           <tr>
-                                              <th className="px-6 py-4">ط±ظ‚ظ… ط§ظ„ط¬ظ„ظˆط³</th>
-                                              <th className="px-6 py-4">ط§ظ„ط§ط³ظ…</th>
-                                              <th className="px-6 py-4">ط§ظ„ط¨ط±ظ†ط§ظ…ط¬</th>
-                                              <th className="px-6 py-4">ط§ظ„ط¥ط¬ط±ط§ط،ط§طھ</th>
+                                              <th className="px-6 py-4">ط·آ±ط¸â€ڑط¸â€¦ ط·آ§ط¸â€‍ط·آ¬ط¸â€‍ط¸ث†ط·آ³</th>
+                                              <th className="px-6 py-4">ط·آ§ط¸â€‍ط·آ§ط·آ³ط¸â€¦</th>
+                                              <th className="px-6 py-4">ط·آ§ط¸â€‍ط·آ¨ط·آ±ط¸â€ ط·آ§ط¸â€¦ط·آ¬</th>
+                                              <th className="px-6 py-4">ط·آ§ط¸â€‍ط·آ¥ط·آ¬ط·آ±ط·آ§ط·طŒط·آ§ط·ع¾</th>
                                           </tr>
                                       </thead>
                                       <tbody className="divide-y divide-slate-50">
@@ -1429,7 +1423,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               boxShadow: '0 32px 64px -16px rgba(0,0,0,0.3)',
             }}
           >
-            {/* â”€â”€ Header â”€â”€ */}
+            {/* أ¢â€‌â‚¬أ¢â€‌â‚¬ Header أ¢â€‌â‚¬أ¢â€‌â‚¬ */}
             <div style={{ padding: '24px 28px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexShrink: 0 }}>
               <div>
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -1442,7 +1436,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               <button disabled={isProcessingUpload} onClick={() => setUploadPreviewData(null)} style={{ flexShrink: 0, padding: '12px', background: '#f8fafc', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: '16px', cursor: 'pointer' }}><X size={20} strokeWidth={2.5}/></button>
             </div>
 
-            {/* â”€â”€ Scrollable Body â”€â”€ */}
+            {/* أ¢â€‌â‚¬أ¢â€‌â‚¬ Scrollable Body أ¢â€‌â‚¬أ¢â€‌â‚¬ */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', minHeight: 0 }}>
               {isProcessingUpload ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '24px', padding: '48px 0' }}>
@@ -1501,7 +1495,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               )}
             </div>
 
-            {/* â”€â”€ Footer â”€â”€ */}
+            {/* أ¢â€‌â‚¬أ¢â€‌â‚¬ Footer أ¢â€‌â‚¬أ¢â€‌â‚¬ */}
             {!isProcessingUpload && (
               <div style={{ padding: '20px 28px', borderTop: '1px solid #e2e8f0', flexShrink: 0 }}>
                 <button

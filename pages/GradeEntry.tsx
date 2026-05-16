@@ -1,5 +1,6 @@
 ﻿
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { calculateStudentGrade } from '../services/storage';
 import { StudentResult, User, UserRole } from '../types';
 import { 
@@ -950,14 +951,14 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                             <span className="block text-[8px] text-indigo-400 mt-0.5">Max: {safeConfig.quizIndividualMaxScores[i] || safeConfig.quizMaxScore}</span>
                                         </th>
                                     ))}
-                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-indigo-50 text-[10px] font-black text-indigo-700 min-w-[70px]">Quiz ط®آ£</th>
+                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-indigo-50 text-[10px] font-black text-indigo-700 min-w-[70px]">Quiz Total</th>
                                     {Array.from({length: safeConfig.assignmentCount}).map((_, i) => (
                                         <th key={i} className="p-3 text-center border-b border-r border-slate-100 text-[9px] font-black hover:bg-emerald-100 transition-colors min-w-[60px]">
                                             A{i+1}
                                             <span className="block text-[8px] text-emerald-400 mt-0.5">Max: {safeConfig.assignmentIndividualMaxScores[i] || safeConfig.assignmentMaxScore}</span>
                                         </th>
                                     ))}
-                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-emerald-50 text-[10px] font-black text-emerald-700 min-w-[70px]">Assig ط®آ£</th>
+                                    <th className="p-3 text-center border-b border-r border-slate-100 bg-emerald-50 text-[10px] font-black text-emerald-700 min-w-[70px]">Assig Total</th>
                                     {safeConfig.enableBonus && <th className="p-3 text-center border-b border-slate-100 text-[10px] font-black text-amber-600 min-w-[60px]">Bonus</th>}
                                     <th className="p-4 text-center border-b border-l border-slate-200 bg-slate-100 sticky right-0 text-[10px] font-black min-w-[80px]">Total</th>
                                 </tr>
@@ -1045,7 +1046,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                           ? (safeConfig.quizIndividualMaxScores[turboContext.index] || safeConfig.quizMaxScore)
                           : (safeConfig.assignmentIndividualMaxScores[turboContext.index] || safeConfig.assignmentMaxScore);
                         return (
-                          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:99999,background:'rgba(2,6,23,0.75)',backdropFilter:'blur(12px)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}} className="animate-fade-in" onClick={() => setTurboSelectedStudentId(null)}>
+                          createPortal(<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:99999,background:'rgba(2,6,23,0.75)',backdropFilter:'blur(12px)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}} className="animate-fade-in" onClick={() => setTurboSelectedStudentId(null)}>
                             <div style={{width:'100%',maxWidth:'460px',borderRadius:'28px',overflow:'hidden',boxShadow:'0 25px 60px -12px rgba(0,0,0,0.5)'}} className="animate-scale-up" onClick={e => e.stopPropagation()}>
 
                               <div style={{background:'linear-gradient(145deg,#4f46e5 0%,#6366f1 50%,#818cf8 100%)',padding:'32px 28px 28px',position:'relative',overflow:'hidden'}}>
@@ -1102,7 +1103,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                               </div>
 
                             </div>
-                          </div>
+                          </div>, document.body)
                         );
                       })()}
 

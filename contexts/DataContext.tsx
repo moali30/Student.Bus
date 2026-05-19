@@ -313,6 +313,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await StorageService.bulkSaveResults(results);
       } catch (e) {
           console.error("Bulk save failed", e);
+          throw e;
       } finally {
           setIsSyncing(false);
       }

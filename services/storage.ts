@@ -112,19 +112,31 @@ const chunkArray = <T>(arr: T[], chunkSize: number): T[][] => {
   return chunks;
 };
 
-const normalizeResultPayload = (result: StudentResult) => ({
-  studentId: result.studentId.trim(),
-  studentName: result.studentName.trim(),
-  program: (result.program || '').trim(),
-  courseId: result.courseId,
-  batchId: result.batchId,
-  quizScores: JSON.stringify(result.quizScores),
-  assignmentScores: JSON.stringify(result.assignmentScores),
-  bonusScore: result.bonusScore === null ? null : Number(result.bonusScore),
-  calculatedTotal: Number(result.calculatedTotal),
-  isLocked: !!result.isLocked,
-  orderIndex: result.orderIndex ?? null
-});
+const normalizeResultPayload = (result: StudentResult) => {
+  const payload: any = {
+    studentId: result.studentId.trim(),
+    studentName: result.studentName.trim(),
+    program: (result.program || '').trim(),
+    courseId: result.courseId,
+    batchId: result.batchId,
+    quizScores: JSON.stringify(result.quizScores),
+    assignmentScores: JSON.stringify(result.assignmentScores),
+    calculatedTotal: Number(result.calculatedTotal),
+    isLocked: !!result.isLocked,
+  };
+
+  // Only include bonusScore if it's a valid number. Appwrite floats can fail on null if not configured properly.
+  if (result.bonusScore !== null && result.bonusScore !== undefined) {
+      payload.bonusScore = Number(result.bonusScore);
+  }
+
+  // Only include orderIndex if it exists, to avoid Unknown Attribute errors if it was missing from schema.
+  if (result.orderIndex !== undefined && result.orderIndex !== null) {
+      payload.orderIndex = result.orderIndex;
+  }
+
+  return payload;
+};
 
 const createAccountREST = async (userId: string, email: string, password: string, name: string) => {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';

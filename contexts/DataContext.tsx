@@ -286,8 +286,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsSyncing(true); // Only trigger sync spinner when ACTUALLY saving (User Action)
         try {
             await StorageService.saveResult(result);
-        } catch (e) {
+        } catch (e: any) {
             console.error("Failed to save result in background", e);
+            alert(`Failed to save grade for ${result.studentName}. Please refresh and try again. Error: ${e.message}`);
         } finally {
             setIsSyncing(false); 
         }

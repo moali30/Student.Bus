@@ -587,8 +587,8 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               
               console.log(`[SINGLE UPLOAD] Excel parsed: ${data.length} rows`);
               if (data.length > 0) {
-                  console.log('[SINGLE UPLOAD] First row keys:', Object.keys(data[0]));
-                  console.log('[SINGLE UPLOAD] First row data:', data[0]);
+                  console.log('[SINGLE UPLOAD] First row keys:', JSON.stringify(Object.keys(data[0])));
+                  console.log('[SINGLE UPLOAD] First row values:', JSON.stringify(data[0]));
               }
               
               // Build a flexible lookup map for matching
@@ -597,9 +597,9 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                   studentLookup.set(cleanId(s.studentId), s);
               });
               
-              console.log(`[SINGLE UPLOAD] Student lookup map has ${studentLookup.size} entries`);
+              console.log(`[SINGLE UPLOAD] Student lookup map has ${studentLookup.size} unique IDs`);
               if (studentLookup.size > 0) {
-                  console.log('[SINGLE UPLOAD] Sample student IDs in roster:', Array.from(studentLookup.keys()).slice(0, 5));
+                  console.log('[SINGLE UPLOAD] Sample roster IDs:', JSON.stringify(Array.from(studentLookup.keys()).slice(0, 5)));
               }
               
               let matchCount = 0;
@@ -630,7 +630,6 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                       const firstKey = Object.keys(normalizedRow)[0];
                       if (firstKey) {
                           const firstVal = String(normalizedRow[firstKey]).trim();
-                          // Only use if it looks like an ID (has digits)
                           if (/\d/.test(firstVal)) {
                               studentId = cleanId(firstVal);
                           }
@@ -639,42 +638,58 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                   
                   if (!studentId) {
                       noIdCount++;
-                      if (rowIdx < 3) console.warn(`[SINGLE UPLOAD] Row ${rowIdx}: No student ID found. Keys:`, Object.keys(normalizedRow));
+                      if (rowIdx < 3) console.warn(`[SINGLE UPLOAD] Row ${rowIdx}: No student ID found. Keys:`, JSON.stringify(Object.keys(normalizedRow)));
                   }
                   
-                  let gradeVal = normalizedRow[targetLabel];
-                  if (gradeVal === undefined) gradeVal = normalizedRow['Grade'] || normalizedRow['Score'] || normalizedRow['الدرجة'] || normalizedRow['grade'] || normalizedRow['score'];
+                  // --- Grade Detection ---
+                  let gradeVal: any = undefined;
                   
+                  // 1. Try exact target label match
+                  if (normalizedRow[targetLabel] !== undefined && normalizedRow[targetLabel] !== '' && normalizedRow[targetLabel] !== null) {
+                      gradeVal = normalizedRow[targetLabel];
+                  }
+                  
+                  // 2. Try common grade column names
                   if (gradeVal === undefined) {
-                      const possibleKeys = Object.keys(normalizedRow).filter(k => 
-                          !['Student ID', 'student id', 'StudentID', 'ID', 'id', 'Student Name', 'student name', 'Name', 'name', 'الاسم', 'رقم الطالب', 'Code', 'code', 'Program', 'program'].includes(k)
-                      );
-                      if (possibleKeys.length === 1) gradeVal = normalizedRow[possibleKeys[0]];
-                      // Also try: if there are exactly 2 non-ID columns, pick the numeric one
-                      if (gradeVal === undefined && possibleKeys.length >= 1) {
-                          const numericKey = possibleKeys.find(k => {
-                              const val = normalizedRow[k];
-                              return val !== undefined && val !== null && !isNaN(Number(val));
-                          });
-                          if (numericKey) gradeVal = normalizedRow[numericKey];
+                      const gradeKeys = ['Grade', 'Score', 'الدرجة', 'grade', 'score', 'الدرجه', 'Mark', 'mark', 'Marks', 'marks'];
+                      for (const gk of gradeKeys) {
+                          if (normalizedRow[gk] !== undefined && normalizedRow[gk] !== '' && normalizedRow[gk] !== null) {
+                              gradeVal = normalizedRow[gk];
+                              break;
+                          }
+                      }
+                  }
+                  
+                  // 3. Try any column that has a real numeric value (not empty, not name-like)
+                  if (gradeVal === undefined) {
+                      const skipKeys = new Set(['Student ID', 'student id', 'StudentID', 'ID', 'id', 'Student Name', 'student name', 'Name', 'name', 'الاسم', 'رقم الطالب', 'Code', 'code', 'Program', 'program', 'البرنامج']);
+                      const candidateKeys = Object.keys(normalizedRow).filter(k => !skipKeys.has(k));
+                      
+                      for (const ck of candidateKeys) {
+                          const val = normalizedRow[ck];
+                          // Must be a non-empty value that is a valid number
+                          if (val !== undefined && val !== null && val !== '' && !isNaN(Number(val))) {
+                              gradeVal = val;
+                              break;
+                          }
                       }
                   }
 
                   const existingStudent = studentLookup.get(studentId);
                   
                   if (!existingStudent && studentId) noMatchCount++;
-                  if (existingStudent && (gradeVal === undefined || gradeVal === null)) noGradeCount++;
-                  if (existingStudent && gradeVal !== undefined && gradeVal !== null) matchCount++;
+                  if (existingStudent && (gradeVal === undefined)) noGradeCount++;
+                  if (existingStudent && gradeVal !== undefined) matchCount++;
                   
                   if (rowIdx < 3) {
-                      console.log(`[SINGLE UPLOAD] Row ${rowIdx}: ID="${studentId}", Grade=${gradeVal}, Match=${!!existingStudent}`);
+                      console.log(`[SINGLE UPLOAD] Row ${rowIdx}: ID="${studentId}", Grade=${JSON.stringify(gradeVal)} (type: ${typeof gradeVal}), Match=${!!existingStudent}`);
                   }
                   
                   return {
                       studentId, 
                       studentName: existingStudent?.studentName || 'Unknown / Not in Roster',
                       grade: gradeVal,
-                      isValid: existingStudent && gradeVal !== undefined && gradeVal !== null && String(gradeVal).trim() !== '',
+                      isValid: !!existingStudent && gradeVal !== undefined && gradeVal !== null && String(gradeVal).trim() !== '',
                       originalRow: row,
                   };
               }).filter((d: any) => d.isValid);

@@ -2,7 +2,15 @@ import { Client, Account, Databases } from 'appwrite';
 
 const client = new Client();
 
-const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1';
+// In production (Vercel), route requests through Vercel's reverse proxy
+// to bypass network-level blocks on fra.cloud.appwrite.io.
+// In local dev, connect directly to Appwrite.
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+const endpoint = isLocalDev
+    ? (import.meta.env.VITE_APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1')
+    : `${window.location.origin}/v1`;
+
 const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID || '6a0633f9001c3a862e93';
 
 client

@@ -3,6 +3,7 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
+    { "source": "/v1/:path*", "destination": "https://fra.cloud.appwrite.io/v1/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

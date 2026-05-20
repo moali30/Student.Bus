@@ -510,9 +510,11 @@ export const StorageService = {
   bulkSaveResults: async (results: StudentResult[]) => {
     if (results.length === 0) return [];
     const insertedOrUpdated: StudentResult[] = [];
+    const failed: string[] = [];
     const courseId = results[0].courseId;
     const batchId = results[0].batchId;
 
+    // 1. Fetch existing students to determine create vs update
     const courseStudentIds = Array.from(new Set(results.map(r => r.studentId.trim()).filter(Boolean)));
     const existingMap = new Map<string, string>();
 
@@ -525,46 +527,45 @@ export const StorageService = {
       docs.forEach(doc => existingMap.set(doc.studentId, doc.$id));
     }
 
-    // Helper: save a single result with retry logic
-    const saveOneWithRetry = async (result: StudentResult, maxRetries = 3): Promise<StudentResult> => {
+    // 2. Save each student ONE AT A TIME (sequential) to avoid rate limits
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
       const existingId = existingMap.get(result.studentId.trim());
       const payload = normalizeResultPayload(result);
 
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      let saved = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           if (existingId) {
             const updated = await databases.updateDocument(databaseId, collectionIdStudentResults, existingId, payload);
-            return { ...result, id: updated.$id };
+            insertedOrUpdated.push({ ...result, id: updated.$id });
+          } else {
+            const created = await databases.createDocument(databaseId, collectionIdStudentResults, ID.unique(), payload);
+            insertedOrUpdated.push({ ...result, id: created.$id });
           }
-          const created = await databases.createDocument(databaseId, collectionIdStudentResults, ID.unique(), payload);
-          return { ...result, id: created.$id };
+          saved = true;
+          break;
         } catch (err: any) {
           const isRateLimit = err?.code === 429 || err?.type === 'general_rate_limit_exceeded';
-          const isLastAttempt = attempt === maxRetries;
-
-          if (isLastAttempt) throw err;
-
-          // Exponential backoff: 1s, 2s, 4s
-          const delayMs = isRateLimit ? 1000 * Math.pow(2, attempt) : 500 * attempt;
-          console.warn(`Retry ${attempt}/${maxRetries} for student ${result.studentId} after ${delayMs}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delayMs));
+          if (attempt < 3) {
+            const delayMs = isRateLimit ? 2000 * attempt : 500 * attempt;
+            console.warn(`Retry ${attempt}/3 for student ${result.studentId} (${err?.message}), waiting ${delayMs}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          } else {
+            console.error(`Failed to save student ${result.studentId} after 3 attempts:`, err?.message);
+            failed.push(result.studentId);
+          }
         }
       }
-      throw new Error('Unreachable');
-    };
 
-    // Process in small sequential chunks with delay between them
-    const CONCURRENT_LIMIT = 5;
-    for (const resultChunk of chunkArray(results, CONCURRENT_LIMIT)) {
-      const chunkResponse = await Promise.all(
-        resultChunk.map(result => saveOneWithRetry(result))
-      );
-      insertedOrUpdated.push(...chunkResponse);
-
-      // Small delay between chunks to avoid rate limiting
-      if (insertedOrUpdated.length < results.length) {
-        await new Promise(resolve => setTimeout(resolve, 300));
+      // Small delay between saves to stay under rate limits
+      if (i < results.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
+    }
+
+    if (failed.length > 0) {
+      console.warn(`Bulk save completed with ${failed.length} failures out of ${results.length}:`, failed);
     }
 
     invalidateCache(`results:${batchId}:${courseId}`);

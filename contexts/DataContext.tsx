@@ -296,7 +296,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const bulkSaveResults = async (results: StudentResult[]) => {
-      if (results.length === 0) return;
+      if (results.length === 0) return [];
       const courseId = results[0].courseId;
 
       // 1. Optimistic Update Cache
@@ -307,10 +307,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { ...prev, [courseId]: Array.from(existingMap.values()) };
       });
 
-      // 2. API Call
+      // 2. API Call - StorageService.bulkSaveResults now handles retries internally
+      //    and continues on individual failures (won't throw for partial saves)
       setIsSyncing(true);
       try {
-          await StorageService.bulkSaveResults(results);
+          const saved = await StorageService.bulkSaveResults(results);
+          return saved;
       } catch (e) {
           console.error("Bulk save failed", e);
           throw e;

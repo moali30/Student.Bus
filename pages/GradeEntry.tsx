@@ -431,6 +431,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
   const confirmRosterUpload = async () => {
       if (!uploadPreviewData || !selectedCourse || !activeBatch) return;
       setIsProcessingUpload(true);
+      setUploadProgress(0);
 
       const studentMap = new Map(students.map(s => [cleanId(s.studentId), s] as [string, StudentResult]));
       const studentsToSave: StudentResult[] = [];
@@ -463,30 +464,31 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
 
       setStudents(Array.from(studentMap.values()));
 
-      const CHUNK_SIZE = 20;
-      const chunks = [];
-      for (let i = 0; i < studentsToSave.length; i += CHUNK_SIZE) {
-          chunks.push(studentsToSave.slice(i, i + CHUNK_SIZE));
-      }
+      // Progress polling: update progress bar periodically
+      let progressInterval: any = null;
+      let estimatedProgress = 0;
+      const totalStudents = studentsToSave.length;
+      progressInterval = setInterval(() => {
+          // Estimate progress based on time (~200ms per student)
+          estimatedProgress = Math.min(estimatedProgress + (100 / totalStudents), 95);
+          setUploadProgress(Math.round(estimatedProgress));
+      }, 200);
 
-      let savedCount = 0;
       try {
-          for (let i = 0; i < chunks.length; i++) {
-              await bulkSaveResults(chunks[i]);
-              savedCount += chunks[i].length;
-              setUploadProgress(Math.round(((i + 1) / chunks.length) * 100));
-
-              // Delay between chunks to prevent rate limiting
-              if (i < chunks.length - 1) {
-                  await new Promise(resolve => setTimeout(resolve, 500));
-              }
-          }
+          const saved = await bulkSaveResults(studentsToSave);
+          clearInterval(progressInterval);
+          setUploadProgress(100);
           await fetchLatestData(selectedCourse.id);
-          setUploadStatus({ msg: `Roster processed: ${savedCount} students synced.`, type: 'success' });
+          setUploadStatus({ msg: `Roster processed: ${saved?.length || studentsToSave.length} students synced.`, type: 'success' });
           setTimeout(() => setUploadPreviewData(null), 1500); 
-      } catch (e) {
-          setUploadStatus({ msg: `Saved ${savedCount}/${studentsToSave.length} students. Network error occurred. Please retry for remaining.`, type: 'error' });
+      } catch (e: any) {
+          clearInterval(progressInterval);
+          console.error('Roster upload error:', e);
+          // Even on error, try to refresh to see what was saved
+          try { await fetchLatestData(selectedCourse.id); } catch {}
+          setUploadStatus({ msg: `Error during save: ${e?.message || 'Unknown error'}. Some students may have been saved - check the list.`, type: 'error' });
       } finally {
+          clearInterval(progressInterval);
           setIsProcessingUpload(false);
           setUploadProgress(0);
       }

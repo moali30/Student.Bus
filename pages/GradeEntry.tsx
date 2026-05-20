@@ -699,8 +699,13 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
 
               if (mappedData.length > 0) {
                 setUploadPreviewData(mappedData);
+              } else if (noGradeCount > 0 && noMatchCount === 0) {
+                // Students matched but grades are empty
+                setUploadStatus({ msg: `⚠️ Students found but the "${targetLabel}" column is empty! Please fill in the grades in Excel first, save, then re-upload.`, type: 'error' });
+              } else if (noMatchCount > 0) {
+                setUploadStatus({ msg: `No matching students found (${noMatchCount} IDs not in roster). Check that Student IDs match the Roster exactly.`, type: 'error' });
               } else {
-                setUploadStatus({ msg: `No matching students found (${data.length} rows read, ${noMatchCount} IDs not in roster). Check that Student IDs match exactly.`, type: 'error' });
+                setUploadStatus({ msg: `No valid data found (${data.length} rows read). Make sure the file has Student ID and grade columns.`, type: 'error' });
               }
 
           } catch (err) {

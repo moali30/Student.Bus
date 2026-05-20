@@ -430,6 +430,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
 
   const confirmRosterUpload = async () => {
       if (!uploadPreviewData || !selectedCourse || !activeBatch) return;
+      console.log(`%c[ROSTER] Starting upload: ${uploadPreviewData.length} preview rows`, 'color: blue; font-weight: bold; font-size: 14px;');
       setIsProcessingUpload(true);
       setUploadProgress(0);
 
@@ -462,6 +463,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
           }
       });
 
+      console.log(`%c[ROSTER] Prepared ${studentsToSave.length} students to save (${studentMap.size} total in map)`, 'color: orange; font-weight: bold;');
       setStudents(Array.from(studentMap.values()));
 
       // Progress polling: update progress bar periodically
@@ -475,15 +477,17 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
       }, 200);
 
       try {
+          console.log(`%c[ROSTER] Calling bulkSaveResults with ${studentsToSave.length} students...`, 'color: purple; font-weight: bold;');
           const saved = await bulkSaveResults(studentsToSave);
           clearInterval(progressInterval);
           setUploadProgress(100);
+          console.log(`%c[ROSTER] bulkSaveResults returned ${saved?.length ?? 'undefined'} saved students`, 'color: green; font-weight: bold; font-size: 14px;');
           await fetchLatestData(selectedCourse.id);
           setUploadStatus({ msg: `Roster processed: ${saved?.length || studentsToSave.length} students synced.`, type: 'success' });
           setTimeout(() => setUploadPreviewData(null), 1500); 
       } catch (e: any) {
           clearInterval(progressInterval);
-          console.error('Roster upload error:', e);
+          console.error('%c[ROSTER] ERROR:', 'color: red; font-weight: bold; font-size: 14px;', e);
           // Even on error, try to refresh to see what was saved
           try { await fetchLatestData(selectedCourse.id); } catch {}
           setUploadStatus({ msg: `Error during save: ${e?.message || 'Unknown error'}. Some students may have been saved - check the list.`, type: 'error' });

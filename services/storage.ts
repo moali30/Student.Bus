@@ -509,6 +509,7 @@ export const StorageService = {
   
   bulkSaveResults: async (results: StudentResult[]) => {
     if (results.length === 0) return [];
+    console.log(`%c[BULK SAVE] Starting: ${results.length} students for course ${results[0].courseId}`, 'color: blue; font-weight: bold; font-size: 14px;');
     const insertedOrUpdated: StudentResult[] = [];
     const failed: string[] = [];
     const courseId = results[0].courseId;
@@ -526,6 +527,7 @@ export const StorageService = {
       ]);
       docs.forEach(doc => existingMap.set(doc.studentId, doc.$id));
     }
+    console.log(`%c[BULK SAVE] Found ${existingMap.size} existing students (update), ${results.length - existingMap.size} new (create)`, 'color: orange; font-weight: bold;');
 
     // 2. Save each student ONE AT A TIME (sequential) to avoid rate limits
     for (let i = 0; i < results.length; i++) {
@@ -544,6 +546,9 @@ export const StorageService = {
             insertedOrUpdated.push({ ...result, id: created.$id });
           }
           saved = true;
+          if ((i + 1) % 10 === 0 || i === results.length - 1) {
+            console.log(`%c[BULK SAVE] Progress: ${i + 1}/${results.length} saved (${failed.length} failed)`, 'color: green;');
+          }
           break;
         } catch (err: any) {
           const isRateLimit = err?.code === 429 || err?.type === 'general_rate_limit_exceeded';
@@ -564,8 +569,9 @@ export const StorageService = {
       }
     }
 
+    console.log(`%c[BULK SAVE] DONE! Saved: ${insertedOrUpdated.length}/${results.length}, Failed: ${failed.length}`, failed.length > 0 ? 'color: red; font-weight: bold; font-size: 14px;' : 'color: green; font-weight: bold; font-size: 14px;');
     if (failed.length > 0) {
-      console.warn(`Bulk save completed with ${failed.length} failures out of ${results.length}:`, failed);
+      console.warn(`[BULK SAVE] Failed student IDs:`, failed);
     }
 
     invalidateCache(`results:${batchId}:${courseId}`);

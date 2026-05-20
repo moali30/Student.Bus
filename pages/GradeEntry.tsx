@@ -620,6 +620,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
       if (!uploadPreviewData || !selectedCourse) return;
 
       setIsProcessingUpload(true);
+      setUploadProgress(0);
       const [type, idxStr] = singleTarget.split('-');
       const index = parseInt(idxStr);
       
@@ -659,30 +660,29 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
           }
       });
 
-      const CHUNK_SIZE = 20; 
-      const chunks = [];
-      for (let i = 0; i < studentsToUpdate.length; i += CHUNK_SIZE) {
-          chunks.push(studentsToUpdate.slice(i, i + CHUNK_SIZE));
-      }
+      // Progress polling
+      let progressInterval: any = null;
+      let estimatedProgress = 0;
+      const totalStudents = studentsToUpdate.length;
+      progressInterval = setInterval(() => {
+          estimatedProgress = Math.min(estimatedProgress + (100 / totalStudents), 95);
+          setUploadProgress(Math.round(estimatedProgress));
+      }, 200);
 
-      let savedCount = 0;
       try {
-          for (let i = 0; i < chunks.length; i++) {
-              await bulkSaveResults(chunks[i]);
-              savedCount += chunks[i].length;
-              setUploadProgress(Math.round(((i + 1) / chunks.length) * 100));
-
-              // Delay between chunks to prevent rate limiting
-              if (i < chunks.length - 1) {
-                  await new Promise(resolve => setTimeout(resolve, 500));
-              }
-          }
+          await bulkSaveResults(studentsToUpdate);
+          clearInterval(progressInterval);
+          setUploadProgress(100);
           await fetchLatestData(selectedCourse.id);
-          setUploadStatus({ msg: `Grades updated for ${savedCount} students.`, type: 'success' });
+          setUploadStatus({ msg: `Grades updated for ${studentsToUpdate.length} students.`, type: 'success' });
           setTimeout(() => setUploadPreviewData(null), 1500);
-      } catch (e) {
-          setUploadStatus({ msg: `Saved ${savedCount}/${studentsToUpdate.length}. Error occurred. Please retry.`, type: 'error' });
+      } catch (e: any) {
+          clearInterval(progressInterval);
+          console.error('Single upload error:', e);
+          try { await fetchLatestData(selectedCourse.id); } catch {}
+          setUploadStatus({ msg: `Error during save: ${e?.message || 'Unknown error'}. Check the list for saved grades.`, type: 'error' });
       } finally {
+          clearInterval(progressInterval);
           setIsProcessingUpload(false);
           setUploadProgress(0);
       }

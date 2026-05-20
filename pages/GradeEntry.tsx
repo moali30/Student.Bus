@@ -678,8 +678,9 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                   const existingStudent = studentLookup.get(studentId);
                   
                   if (!existingStudent && studentId) noMatchCount++;
-                  if (existingStudent && (gradeVal === undefined)) noGradeCount++;
-                  if (existingStudent && gradeVal !== undefined) matchCount++;
+                  const hasGrade = gradeVal !== undefined && gradeVal !== null && String(gradeVal).trim() !== '';
+                  if (existingStudent && !hasGrade) noGradeCount++;
+                  if (existingStudent && hasGrade) matchCount++;
                   
                   if (rowIdx < 3) {
                       console.log(`[SINGLE UPLOAD] Row ${rowIdx}: ID="${studentId}", Grade=${JSON.stringify(gradeVal)} (type: ${typeof gradeVal}), Match=${!!existingStudent}`);

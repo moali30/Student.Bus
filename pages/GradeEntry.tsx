@@ -566,6 +566,10 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
       const file = e.target.files?.[0];
       if (!file || !selectedCourse) return;
       
+      console.log(`%c[SINGLE UPLOAD] File selected: ${file.name}`, 'color: blue; font-weight: bold; font-size: 14px;');
+      console.log(`[SINGLE UPLOAD] Target: ${singleTarget}, Label: ${getTargetLabel(singleTarget)}`);
+      console.log(`[SINGLE UPLOAD] Current roster has ${students.length} students`);
+      
       setUploadType('SINGLE');
       setUploadStatus(null);
       setUploadPreviewData(null);
@@ -581,21 +585,90 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               const ws = wb.Sheets[wb.SheetNames[0]];
               const data = XLSX.utils.sheet_to_json(ws) as any[];
               
-              const mappedData = data.map((row: any) => {
+              console.log(`[SINGLE UPLOAD] Excel parsed: ${data.length} rows`);
+              if (data.length > 0) {
+                  console.log('[SINGLE UPLOAD] First row keys:', Object.keys(data[0]));
+                  console.log('[SINGLE UPLOAD] First row data:', data[0]);
+              }
+              
+              // Build a flexible lookup map for matching
+              const studentLookup = new Map<string, typeof students[0]>();
+              students.forEach(s => {
+                  studentLookup.set(cleanId(s.studentId), s);
+              });
+              
+              console.log(`[SINGLE UPLOAD] Student lookup map has ${studentLookup.size} entries`);
+              if (studentLookup.size > 0) {
+                  console.log('[SINGLE UPLOAD] Sample student IDs in roster:', Array.from(studentLookup.keys()).slice(0, 5));
+              }
+              
+              let matchCount = 0;
+              let noIdCount = 0;
+              let noGradeCount = 0;
+              let noMatchCount = 0;
+              
+              const mappedData = data.map((row: any, rowIdx: number) => {
                   const normalizedRow: any = {};
                   Object.keys(row).forEach(k => normalizedRow[k.trim()] = row[k]);
 
-                  let studentId = cleanId(normalizedRow['Student ID'] || normalizedRow['ID'] || normalizedRow['id']);
+                  let studentId = cleanId(
+                      normalizedRow['Student ID'] || 
+                      normalizedRow['student id'] ||
+                      normalizedRow['StudentID'] ||
+                      normalizedRow['ID'] || 
+                      normalizedRow['id'] ||
+                      normalizedRow['رقم الطالب'] ||
+                      normalizedRow['الرقم'] ||
+                      normalizedRow['Code'] ||
+                      normalizedRow['code'] ||
+                      normalizedRow['No.'] ||
+                      normalizedRow['no.']
+                  );
+                  
+                  // Fallback: if no ID found, try first column
+                  if (!studentId) {
+                      const firstKey = Object.keys(normalizedRow)[0];
+                      if (firstKey) {
+                          const firstVal = String(normalizedRow[firstKey]).trim();
+                          // Only use if it looks like an ID (has digits)
+                          if (/\d/.test(firstVal)) {
+                              studentId = cleanId(firstVal);
+                          }
+                      }
+                  }
+                  
+                  if (!studentId) {
+                      noIdCount++;
+                      if (rowIdx < 3) console.warn(`[SINGLE UPLOAD] Row ${rowIdx}: No student ID found. Keys:`, Object.keys(normalizedRow));
+                  }
                   
                   let gradeVal = normalizedRow[targetLabel];
-                  if (gradeVal === undefined) gradeVal = normalizedRow['Grade'] || normalizedRow['Score'] || normalizedRow['الدرجة'];
+                  if (gradeVal === undefined) gradeVal = normalizedRow['Grade'] || normalizedRow['Score'] || normalizedRow['الدرجة'] || normalizedRow['grade'] || normalizedRow['score'];
                   
                   if (gradeVal === undefined) {
-                      const possibleKeys = Object.keys(normalizedRow).filter(k => !['Student ID', 'ID', 'id', 'Student Name', 'Name', 'name'].includes(k));
+                      const possibleKeys = Object.keys(normalizedRow).filter(k => 
+                          !['Student ID', 'student id', 'StudentID', 'ID', 'id', 'Student Name', 'student name', 'Name', 'name', 'الاسم', 'رقم الطالب', 'Code', 'code', 'Program', 'program'].includes(k)
+                      );
                       if (possibleKeys.length === 1) gradeVal = normalizedRow[possibleKeys[0]];
+                      // Also try: if there are exactly 2 non-ID columns, pick the numeric one
+                      if (gradeVal === undefined && possibleKeys.length >= 1) {
+                          const numericKey = possibleKeys.find(k => {
+                              const val = normalizedRow[k];
+                              return val !== undefined && val !== null && !isNaN(Number(val));
+                          });
+                          if (numericKey) gradeVal = normalizedRow[numericKey];
+                      }
                   }
 
-                  const existingStudent = students.find(s => cleanId(s.studentId) === studentId);
+                  const existingStudent = studentLookup.get(studentId);
+                  
+                  if (!existingStudent && studentId) noMatchCount++;
+                  if (existingStudent && (gradeVal === undefined || gradeVal === null)) noGradeCount++;
+                  if (existingStudent && gradeVal !== undefined && gradeVal !== null) matchCount++;
+                  
+                  if (rowIdx < 3) {
+                      console.log(`[SINGLE UPLOAD] Row ${rowIdx}: ID="${studentId}", Grade=${gradeVal}, Match=${!!existingStudent}`);
+                  }
                   
                   return {
                       studentId, 
@@ -606,13 +679,17 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                   };
               }).filter((d: any) => d.isValid);
 
+              console.log(`%c[SINGLE UPLOAD] Results: ${matchCount} matched, ${noIdCount} no-ID, ${noGradeCount} no-grade, ${noMatchCount} no-roster-match. Final valid: ${mappedData.length}`, 
+                  mappedData.length > 0 ? 'color: green; font-weight: bold;' : 'color: red; font-weight: bold;');
+
               if (mappedData.length > 0) {
                 setUploadPreviewData(mappedData);
               } else {
-                setUploadStatus({ msg: 'No matching students found. Ensure IDs match the Roster.', type: 'error' });
+                setUploadStatus({ msg: `No matching students found (${data.length} rows read, ${noMatchCount} IDs not in roster). Check that Student IDs match exactly.`, type: 'error' });
               }
 
           } catch (err) {
+              console.error('[SINGLE UPLOAD] Parse error:', err);
               setUploadStatus({ msg: 'Failed to process file.', type: 'error' });
           }
       };

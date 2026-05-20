@@ -525,20 +525,46 @@ export const StorageService = {
       docs.forEach(doc => existingMap.set(doc.studentId, doc.$id));
     }
 
-    for (const resultChunk of chunkArray(results, 25)) {
-      const chunkResponse = await Promise.all(
-        resultChunk.map(async result => {
-          const existingId = existingMap.get(result.studentId.trim());
-          const payload = normalizeResultPayload(result);
+    // Helper: save a single result with retry logic
+    const saveOneWithRetry = async (result: StudentResult, maxRetries = 3): Promise<StudentResult> => {
+      const existingId = existingMap.get(result.studentId.trim());
+      const payload = normalizeResultPayload(result);
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
           if (existingId) {
             const updated = await databases.updateDocument(databaseId, collectionIdStudentResults, existingId, payload);
             return { ...result, id: updated.$id };
           }
           const created = await databases.createDocument(databaseId, collectionIdStudentResults, ID.unique(), payload);
           return { ...result, id: created.$id };
-        })
+        } catch (err: any) {
+          const isRateLimit = err?.code === 429 || err?.type === 'general_rate_limit_exceeded';
+          const isLastAttempt = attempt === maxRetries;
+
+          if (isLastAttempt) throw err;
+
+          // Exponential backoff: 1s, 2s, 4s
+          const delayMs = isRateLimit ? 1000 * Math.pow(2, attempt) : 500 * attempt;
+          console.warn(`Retry ${attempt}/${maxRetries} for student ${result.studentId} after ${delayMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+      throw new Error('Unreachable');
+    };
+
+    // Process in small sequential chunks with delay between them
+    const CONCURRENT_LIMIT = 5;
+    for (const resultChunk of chunkArray(results, CONCURRENT_LIMIT)) {
+      const chunkResponse = await Promise.all(
+        resultChunk.map(result => saveOneWithRetry(result))
       );
       insertedOrUpdated.push(...chunkResponse);
+
+      // Small delay between chunks to avoid rate limiting
+      if (insertedOrUpdated.length < results.length) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
     }
 
     invalidateCache(`results:${batchId}:${courseId}`);

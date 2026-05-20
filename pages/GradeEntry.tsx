@@ -463,22 +463,29 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
 
       setStudents(Array.from(studentMap.values()));
 
-      const CHUNK_SIZE = 10;
+      const CHUNK_SIZE = 20;
       const chunks = [];
       for (let i = 0; i < studentsToSave.length; i += CHUNK_SIZE) {
           chunks.push(studentsToSave.slice(i, i + CHUNK_SIZE));
       }
 
+      let savedCount = 0;
       try {
           for (let i = 0; i < chunks.length; i++) {
               await bulkSaveResults(chunks[i]);
+              savedCount += chunks[i].length;
               setUploadProgress(Math.round(((i + 1) / chunks.length) * 100));
+
+              // Delay between chunks to prevent rate limiting
+              if (i < chunks.length - 1) {
+                  await new Promise(resolve => setTimeout(resolve, 500));
+              }
           }
           await fetchLatestData(selectedCourse.id);
-          setUploadStatus({ msg: `Roster processed: ${studentsToSave.length} students synced.`, type: 'success' });
+          setUploadStatus({ msg: `Roster processed: ${savedCount} students synced.`, type: 'success' });
           setTimeout(() => setUploadPreviewData(null), 1500); 
       } catch (e) {
-          setUploadStatus({ msg: 'Network error during save. Please retry.', type: 'error' });
+          setUploadStatus({ msg: `Saved ${savedCount}/${studentsToSave.length} students. Network error occurred. Please retry for remaining.`, type: 'error' });
       } finally {
           setIsProcessingUpload(false);
           setUploadProgress(0);
@@ -650,22 +657,29 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
           }
       });
 
-      const CHUNK_SIZE = 10; 
+      const CHUNK_SIZE = 20; 
       const chunks = [];
       for (let i = 0; i < studentsToUpdate.length; i += CHUNK_SIZE) {
           chunks.push(studentsToUpdate.slice(i, i + CHUNK_SIZE));
       }
 
+      let savedCount = 0;
       try {
           for (let i = 0; i < chunks.length; i++) {
               await bulkSaveResults(chunks[i]);
+              savedCount += chunks[i].length;
               setUploadProgress(Math.round(((i + 1) / chunks.length) * 100));
+
+              // Delay between chunks to prevent rate limiting
+              if (i < chunks.length - 1) {
+                  await new Promise(resolve => setTimeout(resolve, 500));
+              }
           }
           await fetchLatestData(selectedCourse.id);
-          setUploadStatus({ msg: `Grades updated for ${studentsToUpdate.length} students.`, type: 'success' });
+          setUploadStatus({ msg: `Grades updated for ${savedCount} students.`, type: 'success' });
           setTimeout(() => setUploadPreviewData(null), 1500);
       } catch (e) {
-          setUploadStatus({ msg: 'Error during sync.', type: 'error' });
+          setUploadStatus({ msg: `Saved ${savedCount}/${studentsToUpdate.length}. Error occurred. Please retry.`, type: 'error' });
       } finally {
           setIsProcessingUpload(false);
           setUploadProgress(0);

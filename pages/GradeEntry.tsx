@@ -549,23 +549,18 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
       if (!selectedCourse) return;
       const targetLabel = getTargetLabel(singleTarget);
 
-      const templateData = students.map(s => ({
-          'Student ID': s.studentId,
-          'Student Name': s.studentName,
-          [targetLabel]: '' 
-      }));
-
-      if (templateData.length === 0) {
-          templateData.push({
-              'Student ID': '2024001',
-              'Student Name': 'Example Student',
-              [targetLabel]: ''
-          } as any);
-      }
+      // Empty template with headers only — user fills in ID + Grade
+      const templateData: any[] = [{ 'Student ID': '', [targetLabel]: '' }];
 
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(templateData);
-      const wscols = [{wch: 15}, {wch: 30}, {wch: 15}];
+      const ws = XLSX.utils.json_to_sheet(templateData, { skipHeader: false });
+      // Remove the empty data row, keep only headers
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:B1');
+      range.e.r = 0; // Only header row
+      ws['!ref'] = XLSX.utils.encode_range(range);
+      delete ws['A2']; delete ws['B2'];
+      
+      const wscols = [{wch: 18}, {wch: 15}];
       ws['!cols'] = wscols;
       XLSX.utils.book_append_sheet(wb, ws, "Grades");
       XLSX.writeFile(wb, `${selectedCourse.code}_${targetLabel.replace(' ', '')}_Template.xlsx`);
@@ -1484,7 +1479,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                           <Download size={20} /> Download Excel
                                       </button>
                                       <p className="text-[10px] text-slate-400 font-medium px-1">
-                                          *Includes current student IDs and an empty column for <strong>{getTargetLabel(singleTarget)}</strong>.
+                                          *Empty template with <strong>Student ID</strong> + <strong>{getTargetLabel(singleTarget)}</strong> columns only.
                                       </p>
                                   </div>
 

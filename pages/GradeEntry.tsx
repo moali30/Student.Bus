@@ -34,7 +34,11 @@ const normalizeArabic = (text: string) => {
 // Strict ID Normalization to prevent duplicates
 const cleanId = (id: any) => {
     if (id === null || id === undefined) return '';
-    return String(id).trim().toUpperCase();
+    let strId = String(id).trim().toUpperCase();
+    if (strId.includes('@')) {
+        strId = strId.split('@')[0];
+    }
+    return strId;
 };
 
 const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {

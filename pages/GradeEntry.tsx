@@ -112,6 +112,9 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
       };
   }, [selectedCourse]);
 
+  // Track whether this is the initial load for a course (controls auto-tab-switch)
+  const isInitialCourseLoad = useRef(true);
+
   // CRITICAL: Safe Fetch with Data Sanitization
   const fetchLatestData = useCallback(async (courseId: string) => {
       setIsLoading(true);
@@ -136,17 +139,22 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
           });
           setStudents(sortedStudents);
           
-          if (safeStudents.length === 0 && activeTab !== 'ROSTER') setActiveTab('ROSTER');
-          else if (safeStudents.length > 0 && activeTab === 'ROSTER') setActiveTab('GRID');
+          // Only auto-switch tabs on initial course load, not on refresh/re-fetch
+          if (isInitialCourseLoad.current) {
+              if (safeStudents.length === 0) setActiveTab('ROSTER');
+              else setActiveTab('GRID');
+              isInitialCourseLoad.current = false;
+          }
       } catch (error) {
           console.error("Sync failed", error);
       } finally {
           setIsLoading(false);
       }
-  }, [getCourseResults, activeTab, allCourses]);
+  }, [getCourseResults, allCourses]);
 
   useEffect(() => {
     if (selectedCourseId) {
+        isInitialCourseLoad.current = true; // Reset flag when course changes
         fetchLatestData(selectedCourseId);
     } else {
         setStudents([]);
@@ -193,7 +201,8 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
   const handleLocalChange = (student: StudentResult, type: 'quiz' | 'assign' | 'bonus', index: number | null, value: string) => {
       if(!selectedCourse) return;
 
-      const numVal = value === '' ? null : Math.max(0, parseFloat(value) || 0);
+      const parsed = parseFloat(value);
+      const numVal = value === '' ? null : Math.max(0, isNaN(parsed) ? 0 : parsed);
       const updatedStudent = { ...student };
       
       if (type === 'quiz' && index !== null) {
@@ -484,7 +493,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
           console.log(`%c[ROSTER] bulkSaveResults returned ${saved?.length ?? 'undefined'} saved students`, 'color: green; font-weight: bold; font-size: 14px;');
           await fetchLatestData(selectedCourse.id);
           setUploadStatus({ msg: `Roster processed: ${saved?.length || studentsToSave.length} students synced.`, type: 'success' });
-          setTimeout(() => setUploadPreviewData(null), 1500); 
+          setTimeout(() => setUploadPreviewData(null), 3000); 
       } catch (e: any) {
           clearInterval(progressInterval);
           console.error('%c[ROSTER] ERROR:', 'color: red; font-weight: bold; font-size: 14px;', e);
@@ -580,120 +589,115 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
       const reader = new FileReader();
       reader.onload = (evt: ProgressEvent<FileReader>) => {
           try {
-              const bstr = evt.target?.result;
-              const wb = XLSX.read(bstr, { type: 'binary' });
+              // FIX: Use ArrayBuffer for reliable encoding (especially Arabic names)
+              const arrayBuffer = evt.target?.result;
+              const wb = XLSX.read(arrayBuffer, { type: 'array' });
               const ws = wb.Sheets[wb.SheetNames[0]];
-              const data = XLSX.utils.sheet_to_json(ws) as any[];
               
-              console.log(`[SINGLE UPLOAD] Excel parsed: ${data.length} rows`);
-              if (data.length > 0) {
-                  console.log('[SINGLE UPLOAD] First row keys:', JSON.stringify(Object.keys(data[0])));
-                  console.log('[SINGLE UPLOAD] First row values:', JSON.stringify(data[0]));
+              // FIX: Use Matrix mode with Heuristic Header Detection (same as Roster)
+              const gridData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+              
+              if (gridData.length < 2) {
+                  setUploadStatus({ msg: 'File appears empty or missing header row.', type: 'error' });
+                  return;
               }
+
+              console.log(`[SINGLE UPLOAD] Excel parsed: ${gridData.length} rows (matrix mode)`);
+
+              // --- Heuristic Header Detection ---
+              const idKeywords = ['id', 'student id', 'code', 'no.', 'رقم', 'glos'];
+              const nameKeywords = ['name', 'student', 'الاسم', 'طالب', 'full name'];
+              const gradeKeywords = ['grade', 'score', 'mark', 'الدرجة', 'الدرجه', 'درجة',
+                  targetLabel.toLowerCase()];
+
+              let headerRowIdx = 0;
+              for (let r = 0; r < Math.min(gridData.length, 5); r++) {
+                  if (!gridData[r]) continue;
+                  const rowStr = gridData[r].map(c => String(c || '').toLowerCase().trim());
+                  if (rowStr.some(c => idKeywords.some(k => c.includes(k)))) {
+                      headerRowIdx = r;
+                      break;
+                  }
+              }
+
+              const headers = (gridData[headerRowIdx] || []).map(h => String(h || '').trim().toLowerCase());
+              console.log(`[SINGLE UPLOAD] Detected headers at row ${headerRowIdx}:`, JSON.stringify(headers));
+
+              // 1. Find ID Column
+              let idIdx = headers.findIndex(h => idKeywords.some(k => h.includes(k)));
               
-              // Build a flexible lookup map for matching
+              // 2. Find Name Column (exclude ID column)
+              let nameIdx = headers.findIndex((h, i) => {
+                  if (i === idIdx) return false;
+                  return nameKeywords.some(k => h.includes(k));
+              });
+
+              // 3. Find Grade Column (exclude ID & Name columns)
+              let gradeIdx = headers.findIndex((h, i) => {
+                  if (i === idIdx || i === nameIdx) return false;
+                  return gradeKeywords.some(k => h.includes(k));
+              });
+
+              // Fallbacks
+              if (idIdx === -1) idIdx = 0;
+              if (nameIdx === -1) nameIdx = idIdx === 0 ? 1 : 0;
+              if (gradeIdx === -1) {
+                  // Pick the first column that is not ID or Name
+                  for (let i = 0; i < headers.length; i++) {
+                      if (i !== idIdx && i !== nameIdx) { gradeIdx = i; break; }
+                  }
+              }
+
+              console.log(`[SINGLE UPLOAD] Column mapping: ID=${idIdx}, Name=${nameIdx}, Grade=${gradeIdx}`);
+
+              // Build student lookup
               const studentLookup = new Map<string, typeof students[0]>();
               students.forEach(s => {
                   studentLookup.set(cleanId(s.studentId), s);
               });
               
               console.log(`[SINGLE UPLOAD] Student lookup map has ${studentLookup.size} unique IDs`);
-              if (studentLookup.size > 0) {
-                  console.log('[SINGLE UPLOAD] Sample roster IDs:', JSON.stringify(Array.from(studentLookup.keys()).slice(0, 5)));
-              }
-              
+
               let matchCount = 0;
               let noIdCount = 0;
               let noGradeCount = 0;
               let noMatchCount = 0;
               
-              const mappedData = data.map((row: any, rowIdx: number) => {
-                  const normalizedRow: any = {};
-                  Object.keys(row).forEach(k => normalizedRow[k.trim()] = row[k]);
+              const mappedData = gridData.slice(headerRowIdx + 1).map((row: any[], rowIdx: number) => {
+                  if (!row || row.length === 0) return null;
 
-                  let studentId = cleanId(
-                      normalizedRow['Student ID'] || 
-                      normalizedRow['student id'] ||
-                      normalizedRow['StudentID'] ||
-                      normalizedRow['ID'] || 
-                      normalizedRow['id'] ||
-                      normalizedRow['رقم الطالب'] ||
-                      normalizedRow['الرقم'] ||
-                      normalizedRow['Code'] ||
-                      normalizedRow['code'] ||
-                      normalizedRow['No.'] ||
-                      normalizedRow['no.']
-                  );
+                  const studentId = cleanId(row[idIdx]);
                   
-                  // Fallback: if no ID found, try first column
-                  if (!studentId) {
-                      const firstKey = Object.keys(normalizedRow)[0];
-                      if (firstKey) {
-                          const firstVal = String(normalizedRow[firstKey]).trim();
-                          if (/\d/.test(firstVal)) {
-                              studentId = cleanId(firstVal);
-                          }
-                      }
-                  }
-                  
-                  if (!studentId) {
+                  if (!studentId || studentId === 'UNDEFINED') {
                       noIdCount++;
-                      if (rowIdx < 3) console.warn(`[SINGLE UPLOAD] Row ${rowIdx}: No student ID found. Keys:`, JSON.stringify(Object.keys(normalizedRow)));
+                      return null;
                   }
+
+                  // Grade: get from the detected grade column index
+                  const rawGrade = gradeIdx !== -1 ? row[gradeIdx] : undefined;
                   
-                  // --- Grade Detection ---
-                  let gradeVal: any = undefined;
-                  
-                  // 1. Try exact target label match
-                  if (normalizedRow[targetLabel] !== undefined && normalizedRow[targetLabel] !== '' && normalizedRow[targetLabel] !== null) {
-                      gradeVal = normalizedRow[targetLabel];
-                  }
-                  
-                  // 2. Try common grade column names
-                  if (gradeVal === undefined) {
-                      const gradeKeys = ['Grade', 'Score', 'الدرجة', 'grade', 'score', 'الدرجه', 'Mark', 'mark', 'Marks', 'marks'];
-                      for (const gk of gradeKeys) {
-                          if (normalizedRow[gk] !== undefined && normalizedRow[gk] !== '' && normalizedRow[gk] !== null) {
-                              gradeVal = normalizedRow[gk];
-                              break;
-                          }
-                      }
-                  }
-                  
-                  // 3. Try any column that has a real numeric value (not empty, not name-like)
-                  if (gradeVal === undefined) {
-                      const skipKeys = new Set(['Student ID', 'student id', 'StudentID', 'ID', 'id', 'Student Name', 'student name', 'Name', 'name', 'الاسم', 'رقم الطالب', 'Code', 'code', 'Program', 'program', 'البرنامج']);
-                      const candidateKeys = Object.keys(normalizedRow).filter(k => !skipKeys.has(k));
-                      
-                      for (const ck of candidateKeys) {
-                          const val = normalizedRow[ck];
-                          // Must be a non-empty value that is a valid number
-                          if (val !== undefined && val !== null && val !== '' && !isNaN(Number(val))) {
-                              gradeVal = val;
-                              break;
-                          }
-                      }
-                  }
+                  // Accept 0 as a valid grade (critical fix)
+                  const hasGrade = rawGrade !== undefined && rawGrade !== null && String(rawGrade).trim() !== '';
+                  const gradeNum = hasGrade ? Number(rawGrade) : NaN;
+                  const isValidGrade = hasGrade && !isNaN(gradeNum);
 
                   const existingStudent = studentLookup.get(studentId);
                   
-                  if (!existingStudent && studentId) noMatchCount++;
-                  const hasGrade = gradeVal !== undefined && gradeVal !== null && String(gradeVal).trim() !== '';
-                  if (existingStudent && !hasGrade) noGradeCount++;
-                  if (existingStudent && hasGrade) matchCount++;
+                  if (!existingStudent) { noMatchCount++; }
+                  else if (!isValidGrade) { noGradeCount++; }
+                  else { matchCount++; }
                   
                   if (rowIdx < 3) {
-                      console.log(`[SINGLE UPLOAD] Row ${rowIdx}: ID="${studentId}", Grade=${JSON.stringify(gradeVal)} (type: ${typeof gradeVal}), Match=${!!existingStudent}`);
+                      console.log(`[SINGLE UPLOAD] Row ${rowIdx}: ID="${studentId}", RawGrade=${JSON.stringify(rawGrade)}, Parsed=${gradeNum}, Match=${!!existingStudent}`);
                   }
                   
                   return {
                       studentId, 
-                      studentName: existingStudent?.studentName || 'Unknown / Not in Roster',
-                      grade: gradeVal,
-                      isValid: !!existingStudent && gradeVal !== undefined && gradeVal !== null && String(gradeVal).trim() !== '',
-                      originalRow: row,
+                      studentName: existingStudent?.studentName || String(row[nameIdx] || 'Unknown'),
+                      grade: gradeNum,
+                      isValid: !!existingStudent && isValidGrade,
                   };
-              }).filter((d: any) => d.isValid);
+              }).filter((d: any) => d && d.isValid);
 
               console.log(`%c[SINGLE UPLOAD] Results: ${matchCount} matched, ${noIdCount} no-ID, ${noGradeCount} no-grade, ${noMatchCount} no-roster-match. Final valid: ${mappedData.length}`, 
                   mappedData.length > 0 ? 'color: green; font-weight: bold;' : 'color: red; font-weight: bold;');
@@ -701,12 +705,11 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               if (mappedData.length > 0) {
                 setUploadPreviewData(mappedData);
               } else if (noGradeCount > 0 && noMatchCount === 0) {
-                // Students matched but grades are empty
                 setUploadStatus({ msg: `⚠️ Students found but the "${targetLabel}" column is empty! Please fill in the grades in Excel first, save, then re-upload.`, type: 'error' });
               } else if (noMatchCount > 0) {
                 setUploadStatus({ msg: `No matching students found (${noMatchCount} IDs not in roster). Check that Student IDs match the Roster exactly.`, type: 'error' });
               } else {
-                setUploadStatus({ msg: `No valid data found (${data.length} rows read). Make sure the file has Student ID and grade columns.`, type: 'error' });
+                setUploadStatus({ msg: `No valid data found (${gridData.length - 1} rows read). Make sure the file has Student ID and grade columns.`, type: 'error' });
               }
 
           } catch (err) {
@@ -714,7 +717,8 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               setUploadStatus({ msg: 'Failed to process file.', type: 'error' });
           }
       };
-      reader.readAsBinaryString(file);
+      // FIX: Use ArrayBuffer instead of BinaryString for reliable encoding
+      reader.readAsArrayBuffer(file);
       e.target.value = '';
   };
 
@@ -723,8 +727,11 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
 
       setIsProcessingUpload(true);
       setUploadProgress(0);
-      const [type, idxStr] = singleTarget.split('-');
-      const index = parseInt(idxStr);
+      
+      // FIX: Handle 'bonus' target safely (no '-' to split)
+      const isBonus = singleTarget === 'bonus';
+      const type = isBonus ? 'bonus' : singleTarget.split('-')[0];
+      const index = isBonus ? 0 : parseInt(singleTarget.split('-')[1]);
       
       const studentsToUpdate: StudentResult[] = [];
       const tempStudentsMap = new Map<string, StudentResult>(students.map(s => [cleanId(s.studentId), s]));
@@ -735,10 +742,11 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
           
           if (s) {
                const updatedS: StudentResult = JSON.parse(JSON.stringify(s));
-               const numVal = parseFloat(item.grade);
+               const numVal = Number(item.grade);
                
+               // FIX: Accept 0 as valid grade (isNaN(0) === false, so this is correct)
                if (!isNaN(numVal)) {
-                   if (singleTarget === 'bonus') {
+                   if (isBonus) {
                        updatedS.bonusScore = numVal;
                    } else if (type === 'quiz') {
                        updatedS.quizScores = Array.isArray(updatedS.quizScores) ? updatedS.quizScores : [];
@@ -755,19 +763,19 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                        selectedCourse.config
                    );
 
-                   if (updatedS.id === s.id) {
-                       studentsToUpdate.push(updatedS);
-                   }
+                   studentsToUpdate.push(updatedS);
                }
           }
       });
+
+      console.log(`%c[SINGLE UPLOAD] Confirming: ${studentsToUpdate.length} students to update for ${getTargetLabel(singleTarget)}`, 'color: purple; font-weight: bold;');
 
       // Progress polling
       let progressInterval: any = null;
       let estimatedProgress = 0;
       const totalStudents = studentsToUpdate.length;
       progressInterval = setInterval(() => {
-          estimatedProgress = Math.min(estimatedProgress + (100 / totalStudents), 95);
+          estimatedProgress = Math.min(estimatedProgress + (100 / Math.max(totalStudents, 1)), 95);
           setUploadProgress(Math.round(estimatedProgress));
       }, 200);
 
@@ -776,8 +784,8 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
           clearInterval(progressInterval);
           setUploadProgress(100);
           await fetchLatestData(selectedCourse.id);
-          setUploadStatus({ msg: `Grades updated for ${studentsToUpdate.length} students.`, type: 'success' });
-          setTimeout(() => setUploadPreviewData(null), 1500);
+          setUploadStatus({ msg: `✅ Grades updated for ${studentsToUpdate.length} students.`, type: 'success' });
+          setTimeout(() => setUploadPreviewData(null), 3000);
       } catch (e: any) {
           clearInterval(progressInterval);
           console.error('Single upload error:', e);
@@ -843,6 +851,14 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
   };
 
   const handleSaveTurboGrade = (e: React.KeyboardEvent) => {
+      // FIX: Add Escape key to close modal without saving
+      if (e.key === 'Escape') {
+          e.preventDefault();
+          setTurboSelectedStudentId(null);
+          setTurboGradeInput('');
+          setTimeout(() => turboSearchInputRef.current?.focus(), 100);
+          return;
+      }
       if (e.key === 'Enter' && selectedCourse && turboSelectedStudentId) {
           e.preventDefault();
           const studentIndex = students.findIndex(s => s.id === turboSelectedStudentId);
@@ -1114,10 +1130,11 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                             <td key={idx} className="p-3 border-r border-slate-50">
                                                 <input 
                                                     disabled={isReadOnly || s.isLocked}
-                                                    className="w-full h-8 text-center bg-transparent border-b-2 border-transparent focus:border-indigo-500 outline-none font-bold text-slate-600 transition-all placeholder-slate-200"
-                                                    value={(s.quizScores && s.quizScores[idx] !== null) ? s.quizScores[idx]! : ''}
+                                                    inputMode="decimal"
+                                                    className="w-full h-10 text-center bg-transparent border-b-2 border-transparent focus:border-indigo-500 outline-none font-bold text-slate-600 transition-all placeholder-slate-200 min-w-[50px]"
+                                                    value={(s.quizScores && s.quizScores[idx] != null) ? s.quizScores[idx]! : ''}
                                                     placeholder="-"
-                                                    onChange={e => handleLocalChange(s, 'quiz', idx, e.target.value)}
+                                                    onChange={e => { const v = e.target.value; if (v === '' || /^\d*\.?\d*$/.test(v)) handleLocalChange(s, 'quiz', idx, v); }}
                                                 />
                                             </td>
                                         ))}
@@ -1128,10 +1145,11 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                             <td key={idx} className="p-3 border-r border-slate-50">
                                                 <input 
                                                     disabled={isReadOnly || s.isLocked}
-                                                    className="w-full h-8 text-center bg-transparent border-b-2 border-transparent focus:border-emerald-500 outline-none font-bold text-slate-600 transition-all placeholder-slate-200"
-                                                    value={(s.assignmentScores && s.assignmentScores[idx] !== null) ? s.assignmentScores[idx]! : ''}
+                                                    inputMode="decimal"
+                                                    className="w-full h-10 text-center bg-transparent border-b-2 border-transparent focus:border-emerald-500 outline-none font-bold text-slate-600 transition-all placeholder-slate-200 min-w-[50px]"
+                                                    value={(s.assignmentScores && s.assignmentScores[idx] != null) ? s.assignmentScores[idx]! : ''}
                                                     placeholder="-"
-                                                    onChange={e => handleLocalChange(s, 'assign', idx, e.target.value)}
+                                                    onChange={e => { const v = e.target.value; if (v === '' || /^\d*\.?\d*$/.test(v)) handleLocalChange(s, 'assign', idx, v); }}
                                                 />
                                             </td>
                                         ))}
@@ -1374,9 +1392,25 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               )}
 
               {/* --- SINGLE UPLOAD TAB --- */}
-              {activeTab === 'SINGLE' && safeConfig && (
+              {activeTab === 'SINGLE' && safeConfig && (() => {
+                  // Calculate stats for the selected assessment
+                  const isBonus = singleTarget === 'bonus';
+                  const targetType = isBonus ? 'bonus' : singleTarget.split('-')[0];
+                  const targetIdx = isBonus ? 0 : parseInt(singleTarget.split('-')[1]);
+                  const maxScore = isBonus ? '-' : (targetType === 'quiz'
+                      ? (safeConfig.quizIndividualMaxScores[targetIdx] || safeConfig.quizMaxScore)
+                      : (safeConfig.assignmentIndividualMaxScores[targetIdx] || safeConfig.assignmentMaxScore));
+                  const gradedCount = students.filter(s => {
+                      if (isBonus) return s.bonusScore != null;
+                      const scores = targetType === 'quiz' ? s.quizScores : s.assignmentScores;
+                      return scores?.[targetIdx] != null;
+                  }).length;
+                  const pendingCount = students.length - gradedCount;
+                  const gradedPct = students.length > 0 ? Math.round((gradedCount / students.length) * 100) : 0;
+
+                  return (
                   <div className="flex-1 overflow-auto p-8 relative">
-                      <div className="max-w-3xl mx-auto space-y-10 animate-fade-in">
+                      <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
                           <div className="text-center space-y-2">
                               <div className="w-16 h-16 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center mx-auto mb-4">
                                   <Upload size={32} />
@@ -1384,6 +1418,37 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                               <h2 className="text-3xl font-black text-slate-900">Single Assessment Upload</h2>
                               <p className="text-slate-500 font-bold">Update grades for a specific quiz or assignment via Excel.</p>
                           </div>
+
+                          {/* Assessment Status Card */}
+                          {students.length > 0 && (
+                              <div className="bg-gradient-to-br from-violet-50 to-indigo-50 p-6 rounded-3xl border border-violet-100 flex items-center justify-between gap-4 flex-wrap">
+                                  <div className="flex items-center gap-4">
+                                      <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+                                          <BarChart2 size={24} className="text-violet-600" />
+                                      </div>
+                                      <div>
+                                          <p className="text-sm font-black text-slate-800">{getTargetLabel(singleTarget)}</p>
+                                          <p className="text-xs font-bold text-slate-400">Max Score: {maxScore}</p>
+                                      </div>
+                                  </div>
+                                  <div className="flex items-center gap-6">
+                                      <div className="text-center">
+                                          <p className="text-2xl font-black text-emerald-600">{gradedCount}</p>
+                                          <p className="text-[10px] font-black text-slate-400 uppercase">Graded</p>
+                                      </div>
+                                      <div className="text-center">
+                                          <p className="text-2xl font-black text-amber-500">{pendingCount}</p>
+                                          <p className="text-[10px] font-black text-slate-400 uppercase">Pending</p>
+                                      </div>
+                                      <div className="w-24">
+                                          <div className="w-full h-3 bg-white rounded-full overflow-hidden shadow-inner">
+                                              <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all duration-500" style={{width: `${gradedPct}%`}}></div>
+                                          </div>
+                                          <p className="text-[10px] font-black text-violet-600 text-center mt-1">{gradedPct}%</p>
+                                      </div>
+                                  </div>
+                              </div>
+                          )}
 
                           <div className="bg-white p-8 rounded-[40px] shadow-xl border border-slate-100 space-y-8 relative overflow-hidden">
                               {/* Decorative bg */}
@@ -1433,6 +1498,14 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                               </div>
                           </div>
 
+                          {/* Upload status message (outside the card for visibility) */}
+                          {uploadStatus && uploadType === 'SINGLE' && (
+                              <div className={`p-5 rounded-2xl flex items-center gap-3 font-bold text-sm animate-scale-up ${uploadStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                                  {uploadStatus.type === 'success' ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />}
+                                  {uploadStatus.msg}
+                              </div>
+                          )}
+
                           <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 text-center">
                               <p className="text-sm text-slate-500 font-bold">
                                   <span className="text-violet-600">Tip:</span> Only the grade column for the selected assessment will be updated. Other scores remain unchanged.
@@ -1440,7 +1513,8 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                           </div>
                       </div>
                   </div>
-              )}
+                  );
+              })()}
 
               {/* --- ROSTER TAB --- */}
               {activeTab === 'ROSTER' && safeConfig && (
@@ -1528,7 +1602,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                                                       </span>
                                                   </td>
                                                   <td className="px-6 py-4">
-                                                      <button onClick={() => deleteResult(s.id, s.courseId)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors">
+                                                      <button onClick={() => { setStudents(prev => prev.filter(st => st.id !== s.id)); deleteResult(s.id, s.courseId); }} className="p-2 text-slate-300 hover:text-rose-500 transition-colors">
                                                           <Trash2 size={16} />
                                                       </button>
                                                   </td>

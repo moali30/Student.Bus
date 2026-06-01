@@ -129,12 +129,16 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
           const qCount = currentCourse?.config?.quizCount || 0;
           const aCount = currentCourse?.config?.assignmentCount || 0;
 
-          const safeStudents = res.map(s => ({
-              ...s,
-              quizScores: Array.isArray(s.quizScores) ? s.quizScores : Array(qCount).fill(null),
-              assignmentScores: Array.isArray(s.assignmentScores) ? s.assignmentScores : Array(aCount).fill(null),
-              calculatedTotal: typeof s.calculatedTotal === 'number' ? s.calculatedTotal : 0
-          }));
+          const safeStudents = res.map(s => {
+                const qs = Array.isArray(s.quizScores) ? s.quizScores : Array(qCount).fill(null);
+                const as = Array.isArray(s.assignmentScores) ? s.assignmentScores : Array(aCount).fill(null);
+                return {
+                    ...s,
+                    quizScores: qs,
+                    assignmentScores: as,
+                    calculatedTotal: calculateStudentGrade(qs, as, s.bonusScore, currentCourse?.config)
+                };
+            });
 
           const sortedStudents = safeStudents.sort((a, b) => {
               const oa = a.orderIndex ?? 99999;

@@ -69,6 +69,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
   const [uploadStatus, setUploadStatus] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isProcessingUpload, setIsProcessingUpload] = useState(false);
+  const [unmatchedStudents, setUnmatchedStudents] = useState<{ id: string }[]>([]);
   
   // --- Single Upload Specific ---
   const [singleTarget, setSingleTarget] = useState<string>('quiz-0');
@@ -330,6 +331,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
     setUploadStatus(null);
     setUploadPreviewData(null);
     setUploadProgress(0);
+    setUnmatchedStudents([]);
 
     const reader = new FileReader();
     reader.onload = async (evt: ProgressEvent<FileReader>) => {
@@ -586,6 +588,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
       setUploadStatus(null);
       setUploadPreviewData(null);
       setUploadProgress(0);
+      setUnmatchedStudents([]);
 
       const targetLabel = getTargetLabel(singleTarget);
 
@@ -665,6 +668,7 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
               let noIdCount = 0;
               let noGradeCount = 0;
               let noMatchCount = 0;
+              const unmatchedList: { id: string }[] = [];
               
               const mappedData = gridData.slice(headerRowIdx + 1).map((row: any[], rowIdx: number) => {
                   if (!row || row.length === 0) return null;
@@ -686,7 +690,10 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
 
                   const existingStudent = studentLookup.get(studentId);
                   
-                  if (!existingStudent) { noMatchCount++; }
+                  if (!existingStudent) { 
+                      noMatchCount++; 
+                      unmatchedList.push({ id: studentId });
+                  }
                   else if (!isValidGrade) { noGradeCount++; }
                   else { matchCount++; }
                   
@@ -704,6 +711,8 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
 
               console.log(`%c[SINGLE UPLOAD] Results: ${matchCount} matched, ${noIdCount} no-ID, ${noGradeCount} no-grade, ${noMatchCount} no-roster-match. Final valid: ${mappedData.length}`, 
                   mappedData.length > 0 ? 'color: green; font-weight: bold;' : 'color: red; font-weight: bold;');
+
+              setUnmatchedStudents(unmatchedList);
 
               if (mappedData.length > 0) {
                 setUploadPreviewData(mappedData);
@@ -1687,6 +1696,24 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
                     </span>
                     {uploadType === 'SINGLE' && <span className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm border border-indigo-100">{getTargetLabel(singleTarget)}</span>}
                   </div>
+
+                  {unmatchedStudents.length > 0 && (
+                      <div className="mb-5 bg-rose-50 border border-rose-200 rounded-2xl overflow-hidden shadow-sm">
+                          <div className="px-4 py-3 bg-rose-100/50 border-b border-rose-200 flex items-center gap-2 text-rose-700 font-bold text-sm">
+                              <AlertTriangle size={18} />
+                              Found {unmatchedStudents.length} IDs not in the database:
+                          </div>
+                          <div className="p-4 max-h-32 overflow-y-auto">
+                              <div className="flex flex-wrap gap-2">
+                                  {unmatchedStudents.map((u, i) => (
+                                      <span key={i} className="px-2 py-1 bg-white border border-rose-100 text-rose-600 rounded-lg text-xs font-mono font-bold shadow-sm">
+                                          {u.id}
+                                      </span>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
+                  )}
 
                   {/* Data Table */}
                   <div style={{ borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>

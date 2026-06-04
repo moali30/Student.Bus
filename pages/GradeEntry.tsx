@@ -270,10 +270,24 @@ const GradeEntry: React.FC<GradeEntryProps> = ({ user }) => {
              row[`Q${i+1}`] = (s.quizScores?.[i] === null || s.quizScores?.[i] === undefined) ? '' : s.quizScores[i];
         }
         
+        row['Total Quizzes'] = isAllAbs(s.quizScores) ? 'Abs' : calculateStudentGrade(
+            s.quizScores || [],
+            Array(selectedCourse.config.assignmentCount || 0).fill(0),
+            0,
+            { ...selectedCourse.config, assignmentMaxScore: 0, enableBonus: false }
+        );
+
         // Assignments
         for (let i = 0; i < selectedCourse.config.assignmentCount; i++) {
              row[`A${i+1}`] = (s.assignmentScores?.[i] === null || s.assignmentScores?.[i] === undefined) ? '' : s.assignmentScores[i];
         }
+
+        row['Total Assignment'] = isAllAbs(s.assignmentScores) ? 'Abs' : calculateStudentGrade(
+            Array(selectedCourse.config.quizCount || 0).fill(0),
+            s.assignmentScores || [],
+            0,
+            { ...selectedCourse.config, quizMaxScore: 0, enableBonus: false }
+        );
 
         if (selectedCourse.config.enableBonus) {
             row['Bonus'] = s.bonusScore ?? '';
